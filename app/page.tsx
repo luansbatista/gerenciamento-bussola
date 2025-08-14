@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -15,11 +16,35 @@ import { TodayGoals } from "@/components/dashboard/today-goals"
 export default function DashboardPage() {
   const { user } = useAuth()
   const { getWeeklyStats } = useStudy()
+  const [weeklyStats, setWeeklyStats] = useState({ totalHours: 0, totalQuestions: 0, accuracy: 0 })
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!user) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        setIsLoading(true)
+        const stats = await getWeeklyStats(user.id)
+        setWeeklyStats(stats)
+      } catch (error) {
+        console.error('Erro ao carregar estatísticas:', error)
+        // Manter os dados padrão em caso de erro
+        setWeeklyStats({ totalHours: 0, totalQuestions: 0, accuracy: 0 })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadStats()
+  }, [user]) // Removida a dependência getWeeklyStats para evitar loops
 
   if (!user) return null
 
-  const weeklyStats = getWeeklyStats()
-  const todayStudyHours = weeklyStats.todayHours || 0
+  const todayStudyHours = weeklyStats.totalHours / 7 // Média diária da semana
   const dailyGoal = user.studyGoal || 4
   const progressPercentage = dailyGoal > 0 ? (todayStudyHours / dailyGoal) * 100 : 0
 

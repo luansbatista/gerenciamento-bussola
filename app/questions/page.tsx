@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,16 +12,61 @@ import { QuestionStats } from "@/components/questions/question-stats"
 
 import { useSidebar } from "@/lib/sidebar-context"
 import { useQuestions } from "@/lib/questions-context"
+import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/utils/supabase/client"
 
 export default function QuestionsPage() {
   const { isCollapsed } = useSidebar()
   const { questions, subjects, isLoading } = useQuestions()
+  const { user } = useAuth()
+  const supabase = createClient()
   const [selectedSubject, setSelectedSubject] = useState<string>("all")
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>("all")
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [showFilters, setShowFilters] = useState(false)
   const [answeredQuestions, setAnsweredQuestions] = useState<Record<string, number>>({})
   const [showExplanation, setShowExplanation] = useState<Record<string, boolean>>({})
+  const [userAttempts, setUserAttempts] = useState<Record<string, number>>({})
+  const [isLoadingAttempts, setIsLoadingAttempts] = useState(false)
+
+  // Buscar tentativas do usuário do banco de dados
+  const fetchUserAttempts = async () => {
+    if (!user?.id) return
+    
+    setIsLoadingAttempts(true)
+    try {
+      const { data, error } = await supabase
+        .from('question_attempts')
+        .select('question_id, selected_answer, is_correct')
+        .eq('user_id', user.id)
+
+      if (error) {
+        console.error('Erro ao buscar tentativas do usuário:', error)
+        return
+      }
+
+      if (data) {
+        const attemptsMap: Record<string, number> = {}
+        data.forEach(attempt => {
+          attemptsMap[attempt.question_id] = attempt.selected_answer
+        })
+        setUserAttempts(attemptsMap)
+        console.log('Tentativas carregadas do banco:', attemptsMap)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar tentativas:', error)
+    } finally {
+      setIsLoadingAttempts(false)
+    }
+  }
+
+  // Carregar tentativas quando o usuário mudar
+  useEffect(() => {
+    fetchUserAttempts()
+  }, [user?.id])
+
+  // Combinar tentativas do banco com respostas da sessão atual
+  const allAnsweredQuestions = { ...userAttempts, ...answeredQuestions }
 
   // Filter questions based on selected criteria
   const filteredQuestions = questions.filter((question) => {
@@ -32,14 +77,86 @@ export default function QuestionsPage() {
 
   const currentQuestion = filteredQuestions[currentQuestionIndex]
   const totalQuestions = filteredQuestions.length
-  const answeredCount = Object.keys(answeredQuestions).length
-  const correctCount = Object.values(answeredQuestions).filter(
-    (answer, index) => answer === filteredQuestions[index]?.correct_answer,
-  ).length
+  const answeredCount = Object.keys(allAnsweredQuestions).length
+  const correctCount = Object.entries(allAnsweredQuestions).filter(([questionId, selectedAnswer]) => {
+    const question = questions.find(q => q.id === questionId)
+    return question && selectedAnswer === question.correct_answer
+  }).length
 
-  const handleAnswer = (questionId: string, selectedAnswer: number) => {
+  const handleAnswer = async (questionId: string, selectedAnswer: number) => {
+    console.log('handleAnswer - Iniciando salvamento:', { questionId, selectedAnswer, userId: user?.id })
+    
     setAnsweredQuestions((prev) => ({ ...prev, [questionId]: selectedAnswer }))
     setShowExplanation((prev) => ({ ...prev, [questionId]: true }))
+
+    // Salvar resposta no banco de dados
+    try {
+      const currentQuestion = questions.find(q => q.id === questionId)
+      if (!currentQuestion || !user?.id) {
+        console.warn('Questão ou usuário não encontrado')
+        return
+      }
+
+      const isCorrect = selectedAnswer === currentQuestion.correct_answer
+      console.log('handleAnswer - Dados da questão:', { 
+        questionId, 
+        selectedAnswer, 
+        correctAnswer: currentQuestion.correct_answer, 
+        isCorrect,
+        userId: user.id 
+      })
+
+      // Adicionar um pequeno delay para evitar conflitos de UNIQUE constraint
+      const now = new Date()
+      now.setMilliseconds(now.getMilliseconds() + Math.random() * 1000)
+
+      const insertData = {
+        question_id: questionId,
+        user_id: user.id,
+        selected_answer: selectedAnswer,
+        is_correct: isCorrect,
+        attempted_at: now.toISOString(),
+        time_spent: 0 // Valor padrão, pode ser implementado com timer no futuro
+      }
+
+      console.log('handleAnswer - Dados para inserção:', insertData)
+
+      const { error } = await supabase
+        .from('question_attempts')
+        .insert(insertData)
+
+      if (error) {
+        console.error('Erro ao salvar resposta:', error)
+        // Se for erro de UNIQUE constraint, tentar novamente com timestamp diferente
+        if (error.code === '23505') {
+          console.log('handleAnswer - Tentando novamente devido a constraint UNIQUE')
+          const retryNow = new Date()
+          retryNow.setMilliseconds(retryNow.getMilliseconds() + Math.random() * 2000)
+          
+          const retryData = {
+            ...insertData,
+            attempted_at: retryNow.toISOString()
+          }
+          
+          const { error: retryError } = await supabase
+            .from('question_attempts')
+            .insert(retryData)
+          
+          if (retryError) {
+            console.error('Erro ao salvar resposta (tentativa 2):', retryError)
+          } else {
+            console.log('handleAnswer - Resposta salva com sucesso na tentativa 2')
+          }
+        }
+      } else {
+        console.log('handleAnswer - Resposta salva com sucesso')
+        // Recarregar tentativas do banco para atualizar estatísticas
+        await fetchUserAttempts()
+      }
+    } catch (error) {
+      console.error('Erro ao salvar resposta:', error)
+      // Não interromper o fluxo da aplicação, apenas logar o erro
+    }
   }
 
   // Mostrar loading enquanto carrega
@@ -106,6 +223,7 @@ export default function QuestionsPage() {
             totalQuestions={questions.length} 
             answeredCount={answeredCount} 
             correctCount={correctCount} 
+            isLoading={isLoadingAttempts}
           />
         </div>
 

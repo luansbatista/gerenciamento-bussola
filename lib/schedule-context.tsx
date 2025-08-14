@@ -13,6 +13,7 @@ interface StudyPreferences {
   sessionDuration: number // minutes
   prioritizeWeakSubjects: boolean
   includeReviews: boolean
+  selectedSubjects: string[] // Lista de disciplinas selecionadas
 }
 
 interface ScheduleItem {
@@ -39,7 +40,7 @@ interface ScheduleContextType {
   preferences: StudyPreferences
   currentWeekSchedule: WeeklySchedule | null
   updatePreferences: (prefs: Partial<StudyPreferences>) => void
-  generateSchedule: () => void
+  generateSchedule: () => Promise<void>
   markItemCompleted: (itemId: string, actualDuration?: number) => void
   getScheduleForDate: (date: string) => ScheduleItem[]
   getWeeklyProgress: () => { planned: number; completed: number; percentage: number }
@@ -55,6 +56,7 @@ const defaultPreferences: StudyPreferences = {
   sessionDuration: 50,
   prioritizeWeakSubjects: true,
   includeReviews: true,
+  selectedSubjects: [],
 }
 
 export function ScheduleProvider({ children }: { children: ReactNode }) {
@@ -78,9 +80,16 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem("study-preferences")
     if (saved) {
       try {
-        setPreferences(JSON.parse(saved))
+        const loadedPreferences = JSON.parse(saved)
+        // Garantir que selectedSubjects sempre seja um array
+        setPreferences({
+          ...defaultPreferences,
+          ...loadedPreferences,
+          selectedSubjects: loadedPreferences.selectedSubjects || []
+        })
       } catch (error) {
         console.error("Error loading preferences:", error)
+        setPreferences(defaultPreferences)
       }
     }
   }, [])
@@ -103,14 +112,17 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         if (weekStart.toDateString() === currentWeekStart.toDateString()) {
           setCurrentWeekSchedule(schedule)
         } else {
-          generateSchedule()
+          // Não gerar cronograma automaticamente - deixar em branco
+          setCurrentWeekSchedule(null)
         }
       } catch (error) {
         console.error("Error loading schedule:", error)
-        generateSchedule()
+        // Não gerar cronograma automaticamente - deixar em branco
+        setCurrentWeekSchedule(null)
       }
     } else {
-      generateSchedule()
+      // Não gerar cronograma automaticamente - deixar em branco
+      setCurrentWeekSchedule(null)
     }
   }, [studyContext, coachContext, reviewContext])
 
@@ -147,7 +159,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     return slots
   }
 
-  const generateSchedule = () => {
+  const generateSchedule = async () => {
     try {
       if (!studyContext || !coachContext || !reviewContext) {
         console.warn("Contexts not ready for schedule generation")
@@ -173,7 +185,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         dueReviews = []
       }
 
-      const validDueReviews = Array.isArray(dueReviews) ? dueReviews.filter((review) => {
+      let validDueReviews = Array.isArray(dueReviews) ? dueReviews.filter((review) => {
         try {
           return (
             review &&
@@ -196,15 +208,29 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         validDueReviews = []
       }
 
-      const subjects = [
-        "Português",
-        "Matemática",
-        "Direito Constitucional",
-        "História do Brasil",
-        "Geografia do Brasil",
-      ]
+      // Buscar disciplinas disponíveis do banco (apenas das questões cadastradas)
+      let availableSubjects: string[] = []
+      try {
+        if (studyContext.getSubjects && typeof studyContext.getSubjects === "function") {
+          const subjectsData = await studyContext.getSubjects()
+          availableSubjects = subjectsData.map((subject: any) => subject.name)
+        }
+      } catch (error) {
+        console.error("Error getting subjects from database:", error)
+        availableSubjects = [] // Não usar disciplinas padrão
+      }
 
-      const subjectPriorities = subjects
+      // Usar disciplinas selecionadas pelo usuário ou todas as disponíveis das questões
+      const subjectsToUse = (preferences.selectedSubjects || []).length > 0 
+        ? (preferences.selectedSubjects || []).filter(subject => availableSubjects.includes(subject))
+        : availableSubjects
+
+      if (subjectsToUse.length === 0) {
+        console.warn("No subjects available for schedule generation - no questions found in database")
+        return
+      }
+
+      let subjectPriorities = subjectsToUse
         .map((subjectName) => {
           let progress = { accuracy: 50, total: 0, correct: 0 }
           try {
@@ -251,7 +277,12 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       // Ensure subjectPriorities is always a valid array
       if (!Array.isArray(subjectPriorities) || subjectPriorities.length === 0) {
         console.warn("subjectPriorities is invalid, using default")
-        subjectPriorities = [{ subject: "Português", priority: "medium" as const }]
+        subjectPriorities = [{ 
+          subject: subjectsToUse[0] || "Português", 
+          priority: "medium" as "high" | "medium" | "low", 
+          accuracy: 50, 
+          studiedCount: 0 
+        }]
       }
 
       for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
@@ -319,7 +350,12 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
               }
             }
 
-            let subjectToStudy = { subject: "Português", priority: "medium" as const }
+            let subjectToStudy: { subject: string; priority: "high" | "medium" | "low"; accuracy: number; studiedCount: number } = { 
+              subject: "Português", 
+              priority: "medium", 
+              accuracy: 50, 
+              studiedCount: 0 
+            }
             
             try {
               if (Array.isArray(subjectPriorities) && subjectPriorities.length > 0) {

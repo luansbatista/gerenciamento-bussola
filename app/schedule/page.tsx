@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +22,7 @@ import {
   Zap,
 } from "lucide-react"
 import { useSchedule } from "@/lib/schedule-context"
+import { useStudy } from "@/lib/study-context"
 
 const daysOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
 const timePreferences = [
@@ -42,14 +43,52 @@ export default function SchedulePage() {
     getWeeklyProgress,
   } = useSchedule()
 
+  const { getSubjects } = useStudy()
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
   const [showSettings, setShowSettings] = useState(false)
+  const [availableSubjects, setAvailableSubjects] = useState<Array<{ id: string; name: string; color: string }>>([])
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(false)
 
   const progress = getWeeklyProgress()
   const todaySchedule = getScheduleForDate(selectedDate)
 
+  // Carregar disciplinas disponíveis
+  useEffect(() => {
+    const loadSubjects = async () => {
+      setIsLoadingSubjects(true)
+      
+      // Timeout de segurança
+      const timeoutId = setTimeout(() => {
+        console.warn('SchedulePage - Timeout de segurança para carregamento de disciplinas')
+        setIsLoadingSubjects(false)
+      }, 10000) // 10 segundos
+
+      try {
+        const subjects = await getSubjects()
+        console.log('SchedulePage - Disciplinas carregadas:', subjects)
+        setAvailableSubjects(subjects)
+      } catch (error) {
+        console.error('Erro ao carregar disciplinas:', error)
+      } finally {
+        clearTimeout(timeoutId)
+        setIsLoadingSubjects(false)
+      }
+    }
+
+    loadSubjects()
+  }, [getSubjects])
+
   const handlePreferenceChange = (key: keyof typeof preferences, value: any) => {
     updatePreferences({ [key]: value })
+  }
+
+  const handleSubjectToggle = (subjectName: string) => {
+    const currentSelected = preferences.selectedSubjects || []
+    const newSelected = currentSelected.includes(subjectName)
+      ? currentSelected.filter(s => s !== subjectName)
+      : [...currentSelected, subjectName]
+    
+    updatePreferences({ selectedSubjects: newSelected })
   }
 
   const getTypeIcon = (type: string) => {
@@ -127,10 +166,10 @@ export default function SchedulePage() {
               </div>
               <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-cyan-100 bg-clip-text text-transparent">
-                  Cronograma Inteligente
+                  Meu Cronograma
                 </h1>
                 <p className="text-cyan-100 text-lg mt-2">
-                  Planejamento personalizado baseado em suas metas e performance
+                  Crie seu cronograma personalizado baseado em suas metas e disponibilidade
                 </p>
               </div>
             </div>
@@ -142,10 +181,6 @@ export default function SchedulePage() {
               >
                 <Settings className="h-4 w-4 mr-2" />
                 Configurações
-              </Button>
-              <Button onClick={generateSchedule} className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                <Zap className="h-4 w-4 mr-2" />
-                Gerar Novo
               </Button>
             </div>
           </div>
@@ -210,7 +245,7 @@ export default function SchedulePage() {
             <CardHeader className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10">
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5 text-cyan-600" />
-                Configurações do Cronograma
+                Configurar Meu Cronograma
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
@@ -310,9 +345,78 @@ export default function SchedulePage() {
                 </div>
               </div>
 
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>Disciplinas para o Cronograma</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsLoadingSubjects(true)
+                      getSubjects().then(subjects => {
+                        setAvailableSubjects(subjects)
+                        setIsLoadingSubjects(false)
+                      }).catch(error => {
+                        console.error('Erro ao recarregar disciplinas:', error)
+                        setIsLoadingSubjects(false)
+                      })
+                    }}
+                    disabled={isLoadingSubjects}
+                  >
+                    <RotateCcw className={`h-3 w-3 mr-1 ${isLoadingSubjects ? 'animate-spin' : ''}`} />
+                    Recarregar
+                  </Button>
+                </div>
+                <div className="text-sm text-gray-600 mb-3">
+                  Selecione as disciplinas que deseja incluir no cronograma. As disciplinas mostradas são baseadas nas questões cadastradas na página de ADM. Se nenhuma for selecionada, todas as disciplinas disponíveis serão usadas.
+                </div>
+                {isLoadingSubjects ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-sm text-gray-500 mt-2">Carregando disciplinas...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto">
+                    {availableSubjects.map((subject) => (
+                      <div key={subject.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={subject.id}
+                          checked={(preferences.selectedSubjects || []).includes(subject.name)}
+                          onCheckedChange={() => handleSubjectToggle(subject.name)}
+                        />
+                        <Label htmlFor={subject.id} className="text-sm flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: subject.color }}
+                          />
+                          {subject.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {availableSubjects.length === 0 && !isLoadingSubjects && (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-gray-500">Nenhuma disciplina encontrada</p>
+                    <p className="text-xs text-gray-400 mt-1">Cadastre questões na página de ADM para que as disciplinas apareçam aqui</p>
+                    <div className="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-600">
+                      <p><strong>Como resolver:</strong></p>
+                      <p>1. Acesse a página de ADM</p>
+                      <p>2. Cadastre questões para as disciplinas do concurso</p>
+                      <p>3. As disciplinas aparecerão automaticamente aqui</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2">
-                <Button onClick={generateSchedule} className="bg-gradient-to-r from-cyan-600 to-blue-600">
-                  Aplicar e Gerar Cronograma
+                <Button 
+                  onClick={() => generateSchedule().catch(error => {
+                    console.error('Erro ao gerar cronograma:', error)
+                  })} 
+                  className="bg-gradient-to-r from-cyan-600 to-blue-600"
+                >
+                  Criar Meu Cronograma
                 </Button>
                 <Button variant="outline" onClick={() => setShowSettings(false)}>
                   Fechar
@@ -402,12 +506,28 @@ export default function SchedulePage() {
                 ) : (
                   <div className="text-center py-12">
                     <Calendar className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum cronograma gerado</h3>
-                    <p className="text-gray-500 mb-4">Clique em "Gerar Novo" para criar seu cronograma personalizado</p>
-                    <Button onClick={generateSchedule} className="bg-gradient-to-r from-cyan-600 to-blue-600">
-                      <Zap className="h-4 w-4 mr-2" />
-                      Gerar Cronograma
-                    </Button>
+                    <h3 className="text-lg font-semibold text-gray-600 mb-2">Crie seu cronograma personalizado</h3>
+                    <p className="text-gray-500 mb-4">
+                      Configure suas preferências de estudo e gere um cronograma adaptado às suas necessidades e disponibilidade
+                    </p>
+                    <div className="space-y-3">
+                      <Button 
+                        onClick={() => setShowSettings(true)}
+                        className="bg-gradient-to-r from-cyan-600 to-blue-600 mr-2"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Configurar Preferências
+                      </Button>
+                      <Button 
+                        onClick={() => generateSchedule().catch(error => {
+                          console.error('Erro ao gerar cronograma:', error)
+                        })} 
+                        variant="outline"
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        Gerar Cronograma
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -479,12 +599,26 @@ export default function SchedulePage() {
                     <Clock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma atividade agendada</h3>
                     <p className="text-gray-500 mb-4">
-                      Não há atividades programadas para este dia ou o cronograma não foi gerado ainda
+                      Configure suas preferências e gere um cronograma para ver as atividades programadas para este dia
                     </p>
-                    <Button onClick={generateSchedule} className="bg-gradient-to-r from-cyan-600 to-blue-600">
-                      <Zap className="h-4 w-4 mr-2" />
-                      Gerar Cronograma
-                    </Button>
+                    <div className="space-y-3">
+                      <Button 
+                        onClick={() => setShowSettings(true)}
+                        className="bg-gradient-to-r from-cyan-600 to-blue-600 mr-2"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Configurar Preferências
+                      </Button>
+                      <Button 
+                        onClick={() => generateSchedule().catch(error => {
+                          console.error('Erro ao gerar cronograma:', error)
+                        })} 
+                        variant="outline"
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        Gerar Cronograma
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

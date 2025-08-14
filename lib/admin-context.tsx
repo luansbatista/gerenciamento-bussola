@@ -477,15 +477,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   // Deletar questão
   const deleteQuestion = async (id: string) => {
     try {
-  
-      
-      // Remover da lista local apenas
-      setQuestions(prev => prev.filter(q => q.id !== id))
-
-      return { success: true }
-      
-      // TODO: Implementar deleção real no Supabase quando a conexão estiver estável
-      /*
       const { error } = await supabase
         .from('questions')
         .delete()
@@ -493,10 +484,10 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error
 
+      // Remover da lista local
       setQuestions(prev => prev.filter(q => q.id !== id))
 
       return { success: true }
-      */
     } catch (error) {
       console.error('Erro ao deletar questão:', error)
       return { success: false, error }

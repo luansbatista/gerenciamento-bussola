@@ -7,21 +7,105 @@ import { BarChart3, Target, Clock, BookOpen, Trophy, Calendar, TrendingUp, Award
 import { useAnalytics } from "@/lib/analytics-context"
 import { useStudy } from "@/lib/study-context"
 import { useCoach } from "@/lib/coach-context"
+import { useAuth } from "@/lib/auth-context"
+import { useState, useEffect } from "react"
+
+interface QuestionStats {
+  totalAnswered: number
+  correctAnswers: number
+  accuracy: number
+  averageTime: number
+  subjectBreakdown: Record<
+    string,
+    {
+      answered: number
+      correct: number
+      accuracy: number
+    }
+  >
+}
+
+interface StudyAnalytics {
+  dailyQuestions: number[]
+  weeklyHours: number[]
+  monthlyProgress: number[]
+  subjectDistribution: Record<string, number>
+  performanceTrend: "improving" | "stable" | "declining"
+}
 
 export default function StatsPage() {
   const { getQuestionStats, getStudyAnalytics } = useAnalytics()
   const { getWeeklyStats } = useStudy()
   const { studiedTopics } = useCoach()
+  const { user } = useAuth()
+  
+  const [questionStats, setQuestionStats] = useState<QuestionStats>({
+    totalAnswered: 0,
+    correctAnswers: 0,
+    accuracy: 0,
+    averageTime: 0,
+    subjectBreakdown: {}
+  })
+  const [studyAnalytics, setStudyAnalytics] = useState<StudyAnalytics>({
+    dailyQuestions: [0, 0, 0, 0, 0, 0, 0],
+    weeklyHours: [0, 0, 0, 0, 0, 0, 0],
+    monthlyProgress: [],
+    subjectDistribution: {},
+    performanceTrend: "stable"
+  })
+  const [weeklyStats, setWeeklyStats] = useState({
+    totalHours: 0,
+    totalQuestions: 0,
+    accuracy: 0
+  })
+  const [isLoading, setIsLoading] = useState(true)
 
-  const questionStats = getQuestionStats()
-  const studyAnalytics = getStudyAnalytics()
-  const weeklyStats = getWeeklyStats()
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!user?.id) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        setIsLoading(true)
+        
+        // Carregar estatísticas em paralelo
+        const [questionStatsData, studyAnalyticsData, weeklyStatsData] = await Promise.all([
+          getQuestionStats(user.id),
+          getStudyAnalytics(user.id),
+          getWeeklyStats(user.id)
+        ])
+
+        setQuestionStats(questionStatsData)
+        setStudyAnalytics(studyAnalyticsData)
+        setWeeklyStats(weeklyStatsData)
+      } catch (error) {
+        console.error('Erro ao carregar estatísticas:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadStats()
+  }, [user?.id, getQuestionStats, getStudyAnalytics, getWeeklyStats])
 
   const subjectStats = Object.entries(questionStats.subjectBreakdown).map(([subject, stats]) => ({
     name: subject,
     ...stats,
     progress: stats.answered > 0 ? Math.round((stats.correct / stats.answered) * 100) : 0,
   }))
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-lg">Carregando estatísticas...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>

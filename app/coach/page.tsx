@@ -26,7 +26,7 @@ import {
   Zap,
   Star,
 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { useCoach } from "@/lib/coach-context"
 import { useStudy } from "@/lib/study-context"
@@ -148,17 +148,48 @@ const topicsBySubject = {
 
 export default function CoachPage() {
   const { studiedTopics, recommendations, isTopicStudied, getTopicStudyData, getSubjectProgress } = useCoach()
-  const { getWeeklyStats } = useStudy()
+  const { getWeeklyStats, getSubjects } = useStudy()
   const { getPersonalizedTips, getMotivationalMessage, getPerformanceAnalysis } = useInsights()
   const [selectedSubject, setSelectedSubject] = useState<string>("all")
   const [selectedTopicSubject, setSelectedTopicSubject] = useState<string>("Português")
   const [showStudyModal, setShowStudyModal] = useState(false)
   const [selectedTopic, setSelectedTopic] = useState<{ subject: string; topic: string } | null>(null)
+  const [availableSubjects, setAvailableSubjects] = useState<Array<{ id: string; name: string; color: string }>>([])
+  const [weeklyStats, setWeeklyStats] = useState({ totalHours: 0, totalQuestions: 0, accuracy: 0 })
 
-  const weeklyStats = getWeeklyStats()
   const personalizedTips = getPersonalizedTips()
   const motivationalMessage = getMotivationalMessage()
   const performanceAnalysis = getPerformanceAnalysis()
+
+  // Carregar disciplinas disponíveis
+  useEffect(() => {
+    const loadSubjects = async () => {
+      try {
+        const subjects = await getSubjects()
+        setAvailableSubjects(subjects)
+      } catch (error) {
+        console.error('Erro ao carregar disciplinas:', error)
+        setAvailableSubjects([])
+      }
+    }
+
+    loadSubjects()
+  }, [getSubjects])
+
+  // Carregar estatísticas semanais
+  useEffect(() => {
+    const loadWeeklyStats = async () => {
+      try {
+        const stats = await getWeeklyStats()
+        setWeeklyStats(stats)
+      } catch (error) {
+        console.error('Erro ao carregar estatísticas semanais:', error)
+        setWeeklyStats({ totalHours: 0, totalQuestions: 0, accuracy: 0 })
+      }
+    }
+
+    loadWeeklyStats()
+  }, [getWeeklyStats])
 
   const handleStudyTopic = (subject: string, topic: string) => {
     setSelectedTopic({ subject, topic })
@@ -167,7 +198,7 @@ export default function CoachPage() {
 
   const getSubjectPriorities = (subjectFilter: string) => {
     if (subjectFilter === "all") {
-      return mockSubjects.map((subject) => {
+      return availableSubjects.map((subject) => {
         const progress = getSubjectProgress(subject.name)
         return {
           ...subject,
@@ -185,11 +216,12 @@ export default function CoachPage() {
                 : "Ótimo desempenho! Mantenha a consistência",
           studyTime: Math.floor(progress.totalTime / 60),
           accuracy: Math.round(progress.accuracy),
+          questionCount: progress.totalQuestions || 0,
         }
       })
     }
 
-    const subject = mockSubjects.find((s) => s.id === subjectFilter)
+    const subject = availableSubjects.find((s) => s.id === subjectFilter)
     if (!subject) return []
 
     const progress = getSubjectProgress(subject.name)
@@ -206,6 +238,7 @@ export default function CoachPage() {
               : "Excelente! Mantenha o bom trabalho",
         studyTime: Math.floor(progress.totalTime / 60),
         accuracy: Math.round(progress.accuracy),
+        questionCount: progress.totalQuestions || 0,
       },
     ]
   }
@@ -292,7 +325,7 @@ export default function CoachPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as Matérias</SelectItem>
-                {mockSubjects.map((subject) => (
+                {availableSubjects.map((subject) => (
                   <SelectItem key={subject.id} value={subject.id}>
                     {subject.name}
                   </SelectItem>
@@ -526,7 +559,11 @@ export default function CoachPage() {
                           {rec.type === "study_topic" && rec.topic && (
                             <Button
                               size="sm"
-                              onClick={() => handleStudyTopic(rec.subject, rec.topic)}
+                              onClick={() => {
+                                if (rec.topic) {
+                                  handleStudyTopic(rec.subject, rec.topic);
+                                }
+                              }}
                               className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
                             >
                               <Play className="w-4 h-4 mr-2" />
@@ -572,7 +609,7 @@ export default function CoachPage() {
                   Priorização por Matéria
                   {selectedSubject !== "all" && (
                     <Badge variant="outline" className="border-purple-300">
-                      {mockSubjects.find((s) => s.id === selectedSubject)?.name}
+                      {availableSubjects.find((s) => s.id === selectedSubject)?.name}
                     </Badge>
                   )}
                 </CardTitle>
@@ -643,21 +680,19 @@ export default function CoachPage() {
                     <div className="bg-gradient-to-r from-purple-500 to-pink-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Brain className="w-8 w-8 text-white" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma recomendação disponível</h3>
+                    <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma disciplina disponível</h3>
                     <p className="text-gray-500 mb-4">
-                      Comece a estudar para receber recomendações personalizadas do seu coach
+                      Cadastre questões na página de ADM para ver as disciplinas aqui
                     </p>
                     <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
                       <Plus className="w-4 h-4 mr-2" />
-                      Iniciar Estudos
+                      Cadastrar Questões
                     </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
-
-
 
           <TabsContent value="progress" className="space-y-4">
             <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm animate-fade-in-up">
@@ -670,7 +705,7 @@ export default function CoachPage() {
               <CardContent className="p-6">
                 {studiedTopics.length > 0 ? (
                   <div className="space-y-4">
-                    {mockSubjects.map((subject, index) => {
+                    {availableSubjects.map((subject, index) => {
                       const progress = getSubjectProgress(subject.name)
                       if (progress.studiedTopics === 0) return null
 
@@ -764,10 +799,7 @@ export default function CoachPage() {
                 </CardContent>
               </Card>
 
-              <Card
-                className="shadow-xl border-0 bg-white/90 backdrop-blur-sm animate-fade-in-up"
-                style={{ animationDelay: "100ms" }}
-              >
+              <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm animate-fade-in-up">
                 <CardHeader className="bg-gradient-to-r from-pink-500/10 to-red-500/10">
                   <CardTitle className="flex items-center space-x-2">
                     <Heart className="h-5 w-5 text-pink-600" />
@@ -793,10 +825,7 @@ export default function CoachPage() {
               </Card>
             </div>
 
-            <Card
-              className="shadow-xl border-0 bg-white/90 backdrop-blur-sm animate-fade-in-up"
-              style={{ animationDelay: "200ms" }}
-            >
+            <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm animate-fade-in-up">
               <CardHeader className="bg-gradient-to-r from-blue-500/10 to-purple-500/10">
                 <CardTitle className="flex items-center space-x-2">
                   <Lightbulb className="h-5 w-5 text-blue-600" />

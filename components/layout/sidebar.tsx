@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/lib/sidebar-context"
 import { useAuth } from "@/lib/auth-context"
+import { useIsMobile } from "@/hooks/use-mobile"
 import {
   Home,
   FileText,
@@ -24,7 +25,10 @@ import {
   Shield,
   Settings,
   LogOut,
+  Menu,
+  X,
 } from "lucide-react"
+import React from "react"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
@@ -54,6 +58,7 @@ export function Sidebar() {
   const pathname = usePathname()
   const { isCollapsed, toggleSidebar } = useSidebar()
   const { user, logout } = useAuth()
+  const isMobile = useIsMobile()
 
   const isAdmin = user?.isAdmin || user?.role === "admin"
   
@@ -62,6 +67,12 @@ export function Sidebar() {
   console.log('Sidebar - isAdmin:', isAdmin)
   console.log('Sidebar - user?.isAdmin:', user?.isAdmin)
   console.log('Sidebar - user?.role:', user?.role)
+  console.log('Sidebar - isMobile:', isMobile)
+
+  // Se for mobile, não renderizar o sidebar fixo
+  if (isMobile) {
+    return null
+  }
 
   return (
     <div

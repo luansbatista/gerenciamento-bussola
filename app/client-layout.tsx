@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { Sidebar } from "@/components/layout/sidebar"
+import { MobileMenu } from "@/components/layout/mobile-menu"
 import { AuthProvider } from "@/lib/auth-context"
 import { SidebarProvider, useSidebar } from "@/lib/sidebar-context"
 import { NotificationProvider } from "@/lib/notification-context"
@@ -44,34 +45,37 @@ function ConditionalLayout({ children }: { children: React.ReactNode }) {
             <div className="absolute top-2 left-1/4 w-32 h-32 bg-blue-400/5 rounded-full blur-3xl animate-pulse"></div>
             <div className="absolute top-4 right-1/3 w-24 h-24 bg-cyan-400/5 rounded-full blur-2xl animate-pulse delay-1000"></div>
 
-            <div className="relative px-8 py-3">
+            <div className="relative px-4 md:px-8 py-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 flex items-center justify-center">
+                <div className="flex items-center space-x-2 md:space-x-4">
+                  {/* Mobile Menu Button */}
+                  <MobileMenu />
+                  
+                  <div className="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center">
                     <Image
                       src="/bussola-header-logo.png"
                       alt="Bússola Logo"
                       width={64}
                       height={64}
-                      className="drop-shadow-lg"
+                      className="drop-shadow-lg w-full h-full object-contain"
                     />
                   </div>
 
-                  <div>
-                    <h1 className="text-xl font-bold bg-gradient-to-r from-white via-blue-100 to-cyan-200 bg-clip-text text-transparent drop-shadow-sm">
+                  <div className="hidden sm:block">
+                    <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-white via-blue-100 to-cyan-200 bg-clip-text text-transparent drop-shadow-sm">
                       Bússola da Aprovação
                     </h1>
                     <p className="text-blue-200/80 text-xs font-medium tracking-wide">Sistema de Estudos</p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-2 md:space-x-6">
                   <NotificationBell />
 
                   <PomodoroIndicator />
 
                   {/* Status indicator melhorado */}
-                  <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-3 py-1 border border-white/20">
+                  <div className="hidden md:flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-3 py-1 border border-white/20">
                     <div className="relative">
                       <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                       <div className="absolute inset-0 w-2 h-2 bg-green-400 rounded-full animate-ping opacity-75"></div>
@@ -86,7 +90,7 @@ function ConditionalLayout({ children }: { children: React.ReactNode }) {
           <div className="h-2 bg-gradient-to-b from-gray-50 to-transparent"></div>
 
           <main className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-blue-50/30">
-            <div className="animate-fade-in-up">{children}</div>
+            <div>{children}</div>
           </main>
         </div>
       </div>

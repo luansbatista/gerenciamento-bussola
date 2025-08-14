@@ -36,8 +36,8 @@ interface CoachContextType {
   ) => void
   isTopicStudied: (subject: string, topic: string) => boolean
   getTopicStudyData: (subject: string, topic: string) => StudiedTopic | undefined
-  generateRecommendations: () => void
-  getSubjectProgress: (subject: string) => { studiedTopics: number; totalTime: number; accuracy: number }
+  generateRecommendations: () => Promise<void>
+  getSubjectProgress: (subject: string) => { studiedTopics: number; totalTime: number; accuracy: number; totalQuestions: number }
 }
 
 const CoachContext = createContext<CoachContextType | undefined>(undefined)
@@ -117,7 +117,11 @@ export function CoachProvider({ children }: { children: ReactNode }) {
     }
 
     // Generate new recommendations after studying
-    setTimeout(generateRecommendations, 100)
+    setTimeout(() => {
+      generateRecommendations().catch(error => {
+        console.error('Erro ao gerar recomendações:', error)
+      })
+    }, 100)
   }
 
   const isTopicStudied = (subject: string, topic: string) => {
@@ -128,94 +132,99 @@ export function CoachProvider({ children }: { children: ReactNode }) {
     return studiedTopics.find((t) => t.subject === subject && t.topic === topic)
   }
 
-  const generateRecommendations = () => {
-    const weeklyStats = getWeeklyStats()
-    const newRecommendations: CoachRecommendation[] = []
+  const generateRecommendations = async () => {
+    try {
+      const weeklyStats = await getWeeklyStats()
+      const newRecommendations: CoachRecommendation[] = []
 
-    // Clear old recommendations
-    setRecommendations([])
+      // Clear old recommendations
+      setRecommendations([])
 
-    // Recommendation 1: Study high-frequency topics
-    if (studiedTopics.length < 5) {
-      newRecommendations.push({
-        id: "high-freq-topics",
-        type: "study_topic",
-        subject: "Português",
-        topic: "Compreensão e interpretação de textos",
-        priority: "high",
-        reason: "Este tópico representa 57% das questões de Português. Priorize seu estudo!",
-        estimatedTime: 60,
-        createdAt: new Date().toISOString(),
-      })
-    }
-
-    // Recommendation 2: Practice questions if low accuracy
-    if (weeklyStats.accuracy < 70 && weeklyStats.totalQuestions > 10) {
-      newRecommendations.push({
-        id: "practice-questions",
-        type: "practice_questions",
-        subject: "Geral",
-        priority: "high",
-        reason: `Sua taxa de acerto está em ${weeklyStats.accuracy.toFixed(1)}%. Pratique mais questões para melhorar.`,
-        estimatedTime: 45,
-        createdAt: new Date().toISOString(),
-      })
-    }
-
-    // Recommendation 3: Review topics studied more than 3 days ago
-    const threeDaysAgo = new Date()
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
-
-    const topicsToReview = studiedTopics.filter((topic) => new Date(topic.studiedAt) < threeDaysAgo)
-
-    if (topicsToReview.length > 0) {
-      const oldestTopic = topicsToReview.sort(
-        (a, b) => new Date(a.studiedAt).getTime() - new Date(b.studiedAt).getTime(),
-      )[0]
-
-      newRecommendations.push({
-        id: "review-topic",
-        type: "review_topic",
-        subject: oldestTopic.subject,
-        topic: oldestTopic.topic,
-        priority: "medium",
-        reason: "É hora de revisar este tópico para fixar o conhecimento na memória de longo prazo.",
-        estimatedTime: 30,
-        createdAt: new Date().toISOString(),
-      })
-    }
-
-    // Recommendation 4: Take a break if studying too much
-    if (weeklyStats.totalHours > 40) {
-      newRecommendations.push({
-        id: "take-break",
-        type: "take_break",
-        subject: "Geral",
-        priority: "medium",
-        reason: "Você estudou muito esta semana! Considere fazer uma pausa para evitar burnout.",
-        estimatedTime: 0,
-        createdAt: new Date().toISOString(),
-      })
-    }
-
-    // Recommendation 5: Focus on weak subjects
-    const subjects = ["Português", "Matemática", "Direito Constitucional", "História do Brasil"]
-    subjects.forEach((subject) => {
-      const subjectProgress = getSubjectProgress(subject)
-      if (subjectProgress.accuracy < 60 && subjectProgress.questions > 5) {
+      // Recommendation 1: Study high-frequency topics
+      if (studiedTopics.length < 5) {
         newRecommendations.push({
-          id: `weak-subject-${subject}`,
+          id: "high-freq-topics",
           type: "study_topic",
-          subject,
+          subject: "Português",
+          topic: "Compreensão e interpretação de textos",
           priority: "high",
-          reason: `Sua performance em ${subject} está abaixo da média (${subjectProgress.accuracy.toFixed(1)}%). Foque nesta matéria.`,
-          estimatedTime: 90,
+          reason: "Este tópico representa 57% das questões de Português. Priorize seu estudo!",
+          estimatedTime: 60,
           createdAt: new Date().toISOString(),
         })
       }
-    })
 
-    setRecommendations(newRecommendations.slice(0, 5)) // Limit to 5 recommendations
+      // Recommendation 2: Practice questions if low accuracy
+      if (weeklyStats.accuracy < 70 && weeklyStats.totalQuestions > 10) {
+        newRecommendations.push({
+          id: "practice-questions",
+          type: "practice_questions",
+          subject: "Geral",
+          priority: "high",
+          reason: `Sua taxa de acerto está em ${weeklyStats.accuracy.toFixed(1)}%. Pratique mais questões para melhorar.`,
+          estimatedTime: 45,
+          createdAt: new Date().toISOString(),
+        })
+      }
+
+      // Recommendation 3: Review topics studied more than 3 days ago
+      const threeDaysAgo = new Date()
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+
+      const topicsToReview = studiedTopics.filter((topic) => new Date(topic.studiedAt) < threeDaysAgo)
+
+      if (topicsToReview.length > 0) {
+        const oldestTopic = topicsToReview.sort(
+          (a, b) => new Date(a.studiedAt).getTime() - new Date(b.studiedAt).getTime(),
+        )[0]
+
+        newRecommendations.push({
+          id: "review-topic",
+          type: "review_topic",
+          subject: oldestTopic.subject,
+          topic: oldestTopic.topic,
+          priority: "medium",
+          reason: "É hora de revisar este tópico para fixar o conhecimento na memória de longo prazo.",
+          estimatedTime: 30,
+          createdAt: new Date().toISOString(),
+        })
+      }
+
+      // Recommendation 4: Take a break if studying too much
+      if (weeklyStats.totalHours > 40) {
+        newRecommendations.push({
+          id: "take-break",
+          type: "take_break",
+          subject: "Geral",
+          priority: "medium",
+          reason: "Você estudou muito esta semana! Considere fazer uma pausa para evitar burnout.",
+          estimatedTime: 0,
+          createdAt: new Date().toISOString(),
+        })
+      }
+
+      // Recommendation 5: Focus on weak subjects
+      const subjects = ["Português", "Matemática", "Direito Constitucional", "História do Brasil"]
+      for (const subject of subjects) {
+        const subjectProgress = await getSubjectProgress(subject)
+        if (subjectProgress.accuracy < 60 && subjectProgress.questions > 5) {
+          newRecommendations.push({
+            id: `weak-subject-${subject}`,
+            type: "study_topic",
+            subject,
+            priority: "high",
+            reason: `Sua performance em ${subject} está abaixo da média (${subjectProgress.accuracy.toFixed(1)}%). Foque nesta matéria.`,
+            estimatedTime: 90,
+            createdAt: new Date().toISOString(),
+          })
+        }
+      }
+
+      setRecommendations(newRecommendations.slice(0, 5)) // Limit to 5 recommendations
+    } catch (error) {
+      console.error('Erro ao gerar recomendações:', error)
+      setRecommendations([])
+    }
   }
 
   const getSubjectProgressLocal = (subject: string) => {
@@ -226,13 +235,15 @@ export function CoachProvider({ children }: { children: ReactNode }) {
     const totalCorrect = subjectTopics.reduce((sum, t) => sum + t.correctAnswers, 0)
     const accuracy = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0
 
-    return { studiedTopics: studiedTopicsCount, totalTime, accuracy }
+    return { studiedTopics: studiedTopicsCount, totalTime, accuracy, totalQuestions }
   }
 
   // Generate initial recommendations
   useEffect(() => {
     if (studiedTopics.length === 0 && recommendations.length === 0) {
-      generateRecommendations()
+      generateRecommendations().catch(error => {
+        console.error('Erro ao gerar recomendações iniciais:', error)
+      })
     }
   }, [])
 

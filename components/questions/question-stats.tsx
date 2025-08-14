@@ -5,9 +5,10 @@ interface QuestionStatsProps {
   totalQuestions: number
   answeredCount: number
   correctCount: number
+  isLoading?: boolean
 }
 
-export function QuestionStats({ totalQuestions, answeredCount, correctCount }: QuestionStatsProps) {
+export function QuestionStats({ totalQuestions, answeredCount, correctCount, isLoading = false }: QuestionStatsProps) {
   const accuracyPercentage = answeredCount > 0 ? (correctCount / answeredCount) * 100 : 0
   const progressPercentage = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0
 
@@ -49,11 +50,17 @@ export function QuestionStats({ totalQuestions, answeredCount, correctCount }: Q
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className={`h-10 w-10 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
-                <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                {isLoading ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+                ) : (
+                  <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                )}
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-medium">{stat.title}</p>
-                <p className="text-lg font-bold text-gray-900">{stat.value}</p>
+                <p className="text-lg font-bold text-gray-900">
+                  {isLoading ? "..." : stat.value}
+                </p>
               </div>
             </div>
           </CardContent>

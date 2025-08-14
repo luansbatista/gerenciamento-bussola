@@ -26,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check current session
     const checkAuth = async () => {
+      console.log('AuthContext - Iniciando verificação de autenticação')
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
         
@@ -34,6 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsLoading(false)
           return
         }
+
+        console.log('AuthContext - Sessão encontrada:', !!session?.user)
 
         if (session?.user) {
           try {
@@ -65,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               role: session.user.user_metadata?.role || 'student'
             }
 
+            console.log('AuthContext - Usuário definido:', userData)
             setUser(userData)
           } catch (profileError) {
             console.error("Error getting profile:", profileError)
@@ -81,12 +85,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               isAdmin: false,
               role: session.user.user_metadata?.role || 'student'
             }
+            console.log('AuthContext - Usuário definido (sem perfil):', userData)
             setUser(userData)
           }
+        } else {
+          console.log('AuthContext - Nenhuma sessão encontrada')
         }
       } catch (error) {
         console.error("Auth check error:", error)
       } finally {
+        console.log('AuthContext - Finalizando verificação de autenticação')
         setIsLoading(false)
       }
     }
@@ -151,7 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     return () => subscription.unsubscribe()
-  }, [supabase.auth])
+  }, []) // Removida a dependência supabase.auth para evitar loops infinitos
 
   const login = async (email: string, password: string) => {
     try {

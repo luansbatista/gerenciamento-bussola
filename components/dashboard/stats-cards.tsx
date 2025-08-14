@@ -2,23 +2,71 @@ import { Card, CardContent } from "@/components/ui/card"
 import { BookOpen, Clock, Target, TrendingUp } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useStudy } from "@/lib/study-context"
+import { useState, useEffect } from "react"
 
 export function StatsCards() {
   const { user } = useAuth()
   const { getWeeklyStats } = useStudy()
-  
-  const weeklyStats = getWeeklyStats()
-  
-  // Buscar dados reais do usuário
-  const totalStudyHours = user?.totalStudyHours || 0
-  const currentStreak = user?.currentStreak || 0
-  const totalQuestionsAnswered = weeklyStats.totalQuestions || 0
-  const accuracyRate = weeklyStats.accuracy || 0
+  const [stats, setStats] = useState({
+    totalStudyHours: 0,
+    currentStreak: 0,
+    totalQuestionsAnswered: 0,
+    accuracyRate: 0
+  })
+  const [isLoading, setIsLoading] = useState(true)
 
-  const stats = [
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!user) {
+        setIsLoading(false)
+        return
+      }
+
+      // Timeout de segurança para evitar loading infinito
+      const timeoutId = setTimeout(() => {
+        console.warn('StatsCards - Timeout de segurança ativado')
+        setIsLoading(false)
+        setStats({
+          totalStudyHours: 0,
+          currentStreak: user.currentStreak || 0,
+          totalQuestionsAnswered: 0,
+          accuracyRate: 0
+        })
+      }, 10000) // 10 segundos
+
+      try {
+        setIsLoading(true)
+        const weeklyStats = await getWeeklyStats(user.id)
+        
+        setStats({
+          totalStudyHours: weeklyStats.totalHours,
+          currentStreak: user.currentStreak || 0,
+          totalQuestionsAnswered: weeklyStats.totalQuestions,
+          accuracyRate: weeklyStats.accuracy
+        })
+        clearTimeout(timeoutId)
+      } catch (error) {
+        console.error('Erro ao carregar estatísticas:', error)
+        // Manter dados padrão em caso de erro
+        setStats({
+          totalStudyHours: 0,
+          currentStreak: user.currentStreak || 0,
+          totalQuestionsAnswered: 0,
+          accuracyRate: 0
+        })
+        clearTimeout(timeoutId)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadStats()
+  }, [user]) // Removida a dependência getWeeklyStats para evitar loops
+
+  const statsData = [
     {
       title: "Horas Estudadas",
-      value: totalStudyHours,
+      value: Math.round(stats.totalStudyHours * 10) / 10,
       unit: "h",
       icon: Clock,
       color: "text-blue-600",
@@ -26,7 +74,7 @@ export function StatsCards() {
     },
     {
       title: "Sequência Atual",
-      value: currentStreak,
+      value: stats.currentStreak,
       unit: "dias",
       icon: Target,
       color: "text-green-600",
@@ -34,7 +82,7 @@ export function StatsCards() {
     },
     {
       title: "Questões Resolvidas",
-      value: totalQuestionsAnswered,
+      value: stats.totalQuestionsAnswered,
       unit: "",
       icon: BookOpen,
       color: "text-purple-600",
@@ -42,7 +90,7 @@ export function StatsCards() {
     },
     {
       title: "Taxa de Acerto",
-      value: Math.round(accuracyRate),
+      value: Math.round(stats.accuracyRate),
       unit: "%",
       icon: TrendingUp,
       color: "text-orange-600",
@@ -52,7 +100,7 @@ export function StatsCards() {
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {stats.map((stat) => (
+      {statsData.map((stat) => (
         <Card key={stat.title}>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
