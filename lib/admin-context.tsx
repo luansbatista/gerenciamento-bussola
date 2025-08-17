@@ -170,7 +170,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         averageAccuracy
       })
     } catch (error) {
-      console.error('Erro ao buscar estatísticas:', error)
       // Dados mockados como fallback
       setStats({
         totalUsers: 0,
@@ -195,7 +194,10 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        // Silent error handling
+        return
+      }
 
       const usersWithStatus: User[] = (data || []).map(user => ({
         id: user.id,
@@ -212,7 +214,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
       setUsers(usersWithStatus)
     } catch (error) {
-      console.error('Erro ao buscar usuários:', error)
       setUsers([])
     } finally {
       setIsLoadingUsers(false)
@@ -231,7 +232,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('Erro do Supabase ao buscar questões:', error)
         setQuestions([])
         return
       }
@@ -264,7 +264,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         setQuestions([])
       }
     } catch (error) {
-      console.error('Erro ao buscar questões:', error)
       setQuestions([])
     } finally {
       setIsLoadingQuestions(false)
@@ -381,30 +380,36 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
   // Adicionar questão
   const addQuestion = async (question: Omit<Question, 'id' | 'created_at' | 'times_answered' | 'accuracy_rate'>): Promise<{ success: boolean; data?: Question; error?: any }> => {
-    console.log('addQuestion chamada com:', question)
+    console.log('=== INÍCIO addQuestion ===')
+    console.log('addQuestion chamada com:', JSON.stringify(question, null, 2))
     try {
       console.log('Inserindo questão no Supabase...')
       
-      // Preparar dados para inserção
+      // Preparar dados para inserção - mapeando colunas do CSV
       const questionData = {
-        subject: question.subject || question.disciplina,
-        disciplina: question.disciplina,
-        assunto: question.assunto,
-        question: question.question,
-        enunciado: question.enunciado,
-        options: Array.isArray(question.options) ? question.options : JSON.stringify(question.options),
-        opcao_a: question.opcao_a,
-        opcao_b: question.opcao_b,
-        opcao_c: question.opcao_c,
-        opcao_d: question.opcao_d,
-        opcao_e: question.opcao_e,
-        correct_answer: question.correct_answer,
-        alternativa_correta: question.alternativa_correta,
-        difficulty: question.difficulty || question.nivel,
-        nivel: question.nivel
+        disciplina: question.disciplina || '',
+        subject: question.disciplina || question.subject || '', // Usar disciplina como subject também
+        assunto: question.assunto || '',
+        question: question.question || question.enunciado || '', // Usar enunciado se question não existir
+        enunciado: question.enunciado || question.question || '', // Usar question se enunciado não existir
+        opcao_a: question.opcao_a || '',
+        opcao_b: question.opcao_b || '',
+        opcao_c: question.opcao_c || '',
+        opcao_d: question.opcao_d || '',
+        opcao_e: question.opcao_e || '', // Coluna do CSV
+        alternativa_correta: question.alternativa_correta || question.correct_answer || '',
+        correct_answer: question.correct_answer || question.alternativa_correta || '',
+        difficulty: question.difficulty || question.nivel || 'médio', // Usar nivel como difficulty
+        nivel: question.nivel || question.difficulty || 'médio' // Usar difficulty como nivel
       }
 
-      console.log('Dados preparados para inserção:', questionData)
+      console.log('Dados preparados para inserção:', JSON.stringify(questionData, null, 2))
+      console.log('Tentando inserir no Supabase...')
+
+      // Verificar se todos os campos obrigatórios estão presentes
+      if (!questionData.disciplina || !questionData.question) {
+        throw new Error('Campos obrigatórios (disciplina e question) não podem estar vazios')
+      }
 
       const { data, error } = await supabase
         .from('questions')
@@ -412,8 +417,19 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         .select()
         .single()
 
+      console.log('Resposta do Supabase - data:', data)
+      console.log('Resposta do Supabase - error:', error)
+
       if (error) {
+        console.error('=== ERRO DO SUPABASE ===')
         console.error('Erro do Supabase:', error)
+        console.error('Detalhes do erro:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        })
+        console.error('Dados que tentaram ser inseridos:', JSON.stringify(questionData, null, 2))
         throw error
       }
 
@@ -434,9 +450,15 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         return newList
       })
 
+      console.log('=== FIM addQuestion - SUCESSO ===')
       return { success: true, data: newQuestion }
     } catch (error) {
+      console.error('=== ERRO EM addQuestion ===')
       console.error('Erro ao adicionar questão:', error)
+      console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
+      console.error('Tipo do erro:', typeof error)
+      console.error('Erro como string:', String(error))
+      console.error('=== FIM addQuestion - ERRO ===')
       return { success: false, error }
     }
   }

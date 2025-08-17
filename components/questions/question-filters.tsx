@@ -19,6 +19,10 @@ interface QuestionFiltersProps {
   selectedDifficulty: string
   onSubjectChange: (subject: string) => void
   onDifficultyChange: (difficulty: string) => void
+  // Estatísticas reais
+  totalQuestions: number
+  answeredToday: number
+  accuracyRate: number
 }
 
 export function QuestionFilters({
@@ -27,6 +31,9 @@ export function QuestionFilters({
   selectedDifficulty,
   onSubjectChange,
   onDifficultyChange,
+  totalQuestions,
+  answeredToday,
+  accuracyRate,
 }: QuestionFiltersProps) {
   const difficulties = [
     { value: "all", label: "Todas", color: "bg-gray-100 text-gray-700" },
@@ -99,15 +106,15 @@ export function QuestionFilters({
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Total de questões</span>
-            <Badge variant="secondary">1,247</Badge>
+            <Badge variant="secondary">{totalQuestions}</Badge>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Respondidas hoje</span>
-            <Badge variant="secondary">32</Badge>
+            <Badge variant="secondary">{answeredToday}</Badge>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Taxa de acerto</span>
-            <Badge variant="secondary">78%</Badge>
+            <Badge variant="secondary">{accuracyRate}%</Badge>
           </div>
         </CardContent>
       </Card>

@@ -6,23 +6,14 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUz
 
 // Verificar se as configurações estão presentes
 if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Configuração Supabase incompleta:', {
-    url: supabaseUrl ? 'PRESENTE' : 'AUSENTE',
-    key: supabaseKey ? 'PRESENTE' : 'AUSENTE'
-  });
+  throw new Error('Supabase URL e Key são obrigatórios')
 }
 
 export const createClient = () => {
   try {
     const client = createBrowserClient(supabaseUrl, supabaseKey);
-    console.log('✅ Cliente Supabase criado:', {
-      url: supabaseUrl,
-      keyPresent: !!supabaseKey,
-      keyLength: supabaseKey?.length || 0
-    });
     return client;
   } catch (error) {
-    console.error('❌ Erro ao criar cliente Supabase:', error);
     throw error;
   }
 };

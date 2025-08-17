@@ -190,40 +190,46 @@ export function ImportQuestions() {
   const convertQuestion = (question: QuestionImport) => {
     console.log('Convertendo questão:', question)
     
-    const options = [
-      question.opcaoA,
-      question.opcaoB,
-      question.opcaoC,
-      question.opcaoD,
-      ...(question.opcaoE ? [question.opcaoE] : [])
-    ].filter(option => option && option.trim() !== '') // Remove opções vazias
+    // Mapear dificuldade
+    const difficulty = question.nivel?.toLowerCase() === 'fácil' ? 'easy' as const : 
+                     question.nivel?.toLowerCase() === 'médio' ? 'medium' as const : 
+                     question.nivel?.toLowerCase() === 'difícil' ? 'hard' as const : 'medium' as const
 
-    const correctAnswerMap: { [key: string]: number } = {
-      'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4
-    }
-
-    // Converter nível para difficulty válido
-    const nivel = question.nivel?.toLowerCase() || 'medium'
-    const difficulty = (nivel === 'easy' || nivel === 'medium' || nivel === 'hard') 
-      ? nivel as 'easy' | 'medium' | 'hard' 
-      : 'medium'
-
+    // Garantir que alternativa_correta seja uma string válida
+    const alternativaCorreta = question.alternativaCorreta?.toString()?.toUpperCase() || 'A'
+    
+    // Mapear alternativa correta para número (A=0, B=1, C=2, D=3, E=4)
+    const correctAnswerNumber = alternativaCorreta === 'A' ? 0 : 
+                               alternativaCorreta === 'B' ? 1 : 
+                               alternativaCorreta === 'C' ? 2 : 
+                               alternativaCorreta === 'D' ? 3 : 
+                               alternativaCorreta === 'E' ? 4 : 0
+    
+    // Garantir que todos os campos sejam strings válidas
     const convertedQuestion = {
-      disciplina: question.disciplina,
-      assunto: question.assunto,
-      question: question.enunciado,
-      enunciado: question.enunciado,
-      options: options,
-      opcao_a: question.opcaoA,
-      opcao_b: question.opcaoB,
-      opcao_c: question.opcaoC,
-      opcao_d: question.opcaoD,
-      opcao_e: question.opcaoE || '',
-      correct_answer: correctAnswerMap[question.alternativaCorreta.toUpperCase()] || 0,
-      alternativa_correta: question.alternativaCorreta.toUpperCase(),
+      disciplina: question.disciplina?.toString() || '',
+      assunto: question.assunto?.toString() || '',
+      question: question.enunciado?.toString() || '',
+      enunciado: question.enunciado?.toString() || '',
+      opcao_a: question.opcaoA?.toString() || '',
+      opcao_b: question.opcaoB?.toString() || '',
+      opcao_c: question.opcaoC?.toString() || '',
+      opcao_d: question.opcaoD?.toString() || '',
+      opcao_e: question.opcaoE?.toString() || '',
+      correct_answer: correctAnswerNumber, // Número conforme esperado pelo tipo
+      alternativa_correta: alternativaCorreta,
       difficulty: difficulty,
-      nivel: question.nivel || 'medium',
-      subject: question.disciplina // Mantém compatibilidade
+      nivel: question.nivel?.toString() || 'médio',
+      subject: question.disciplina?.toString() || 'Geral', // Garantir que seja sempre string
+      // Campos para compatibilidade
+      options: [
+        question.opcaoA?.toString() || '',
+        question.opcaoB?.toString() || '',
+        question.opcaoC?.toString() || '',
+        question.opcaoD?.toString() || '',
+        question.opcaoE?.toString() || ''
+      ].filter(Boolean),
+      correctAnswer: alternativaCorreta
     }
 
     console.log('Questão convertida:', convertedQuestion)

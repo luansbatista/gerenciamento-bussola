@@ -3,8 +3,9 @@
 import type React from "react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { MobileMenu } from "@/components/layout/mobile-menu"
+import { DesktopMenuButton } from "@/components/layout/desktop-menu-button"
 import { AuthProvider } from "@/lib/auth-context"
-import { SidebarProvider, useSidebar } from "@/lib/sidebar-context"
+import { SidebarProvider } from "@/lib/sidebar-context"
 import { NotificationProvider } from "@/lib/notification-context"
 import { PomodoroProvider } from "@/lib/pomodoro-context"
 import { StudyProvider } from "@/lib/study-context"
@@ -25,7 +26,6 @@ import Image from "next/image"
 function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isAuthPage = pathname === "/login" || pathname === "/signup"
-  const { isCollapsed } = useSidebar()
 
   if (isAuthPage) {
     return <div className="min-h-screen">{children}</div>
@@ -35,7 +35,7 @@ function ConditionalLayout({ children }: { children: React.ReactNode }) {
     <ProtectedRoute>
       <div className="flex h-screen">
         <Sidebar />
-        <div className={`flex-1 flex flex-col transition-all duration-300 ${isCollapsed ? "md:ml-20" : "md:ml-72"}`}>
+        <div className="flex-1 flex flex-col">
           <div className="relative bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 shadow-2xl border-b border-blue-500/20 overflow-hidden">
             {/* Elementos decorativos de fundo */}
             <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-transparent to-blue-600/10"></div>
@@ -50,6 +50,9 @@ function ConditionalLayout({ children }: { children: React.ReactNode }) {
                 <div className="flex items-center space-x-2 md:space-x-4">
                   {/* Mobile Menu Button */}
                   <MobileMenu />
+                  
+                  {/* Desktop Menu Button */}
+                  <DesktopMenuButton />
                   
                   <div className="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center">
                     <Image

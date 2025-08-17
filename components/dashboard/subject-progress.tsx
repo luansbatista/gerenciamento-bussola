@@ -46,20 +46,18 @@ export function SubjectProgress() {
 
       // Timeout de segurança para evitar loading infinito
       const timeoutId = setTimeout(() => {
-        console.warn('SubjectProgress - Timeout de segurança ativado')
         setIsLoading(false)
         setSubjectProgress([])
-      }, 10000) // 10 segundos
+      }, 5000) // 5 segundos
 
       try {
         setIsLoading(true)
         
         // Primeiro, buscar as disciplinas do banco
         const subjectsData = await getSubjects()
-        console.log('SubjectProgress - Disciplinas carregadas:', subjectsData)
+
         
         if (subjectsData.length === 0) {
-          console.warn('Nenhuma disciplina encontrada no banco')
           clearTimeout(timeoutId)
           setIsLoading(false)
           return
@@ -86,11 +84,9 @@ export function SubjectProgress() {
           })
         )
         
-        console.log('SubjectProgress - Progresso carregado:', progressData)
         setSubjectProgress(progressData)
         clearTimeout(timeoutId)
       } catch (error) {
-        console.error('Erro ao carregar disciplinas e progresso:', error)
         setSubjectProgress([])
         clearTimeout(timeoutId)
       } finally {
@@ -99,7 +95,7 @@ export function SubjectProgress() {
     }
 
     loadSubjectsAndProgress()
-  }, [user?.id, getSubjectProgress, getSubjects])
+  }, [user?.id]) // Removidas as dependências getSubjectProgress e getSubjects que causavam o loop
 
   if (isLoading) {
     return (

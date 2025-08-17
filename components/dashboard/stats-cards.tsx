@@ -15,53 +15,64 @@ export function StatsCards() {
   })
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    const loadStats = async () => {
-      if (!user) {
-        setIsLoading(false)
-        return
-      }
-
-      // Timeout de segurança para evitar loading infinito
-      const timeoutId = setTimeout(() => {
-        console.warn('StatsCards - Timeout de segurança ativado')
-        setIsLoading(false)
-        setStats({
-          totalStudyHours: 0,
-          currentStreak: user.currentStreak || 0,
-          totalQuestionsAnswered: 0,
-          accuracyRate: 0
-        })
-      }, 10000) // 10 segundos
-
-      try {
-        setIsLoading(true)
-        const weeklyStats = await getWeeklyStats(user.id)
-        
-        setStats({
-          totalStudyHours: weeklyStats.totalHours,
-          currentStreak: user.currentStreak || 0,
-          totalQuestionsAnswered: weeklyStats.totalQuestions,
-          accuracyRate: weeklyStats.accuracy
-        })
-        clearTimeout(timeoutId)
-      } catch (error) {
-        console.error('Erro ao carregar estatísticas:', error)
-        // Manter dados padrão em caso de erro
-        setStats({
-          totalStudyHours: 0,
-          currentStreak: user.currentStreak || 0,
-          totalQuestionsAnswered: 0,
-          accuracyRate: 0
-        })
-        clearTimeout(timeoutId)
-      } finally {
-        setIsLoading(false)
-      }
+  const loadStats = async () => {
+    if (!user) {
+      setIsLoading(false)
+      return
     }
 
+    // Timeout de segurança para evitar loading infinito
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false)
+      setStats({
+        totalStudyHours: 0,
+        currentStreak: user.currentStreak || 0,
+        totalQuestionsAnswered: 0,
+        accuracyRate: 0
+      })
+    }, 5000) // 5 segundos
+
+    try {
+      setIsLoading(true)
+      const weeklyStats = await getWeeklyStats(user.id)
+      
+      setStats({
+        totalStudyHours: weeklyStats.totalHours,
+        currentStreak: user.currentStreak || 0,
+        totalQuestionsAnswered: weeklyStats.totalQuestions,
+        accuracyRate: weeklyStats.accuracy
+      })
+      clearTimeout(timeoutId)
+    } catch (error) {
+      // Manter dados padrão em caso de erro
+      setStats({
+        totalStudyHours: 0,
+        currentStreak: user.currentStreak || 0,
+        totalQuestionsAnswered: 0,
+        accuracyRate: 0
+      })
+      clearTimeout(timeoutId)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
     loadStats()
-  }, [user]) // Removida a dependência getWeeklyStats para evitar loops
+  }, [user?.id]) // Usar apenas user.id para evitar loops
+
+  // Escutar evento de atualização de estatísticas
+  useEffect(() => {
+    const handleStatsUpdate = () => {
+      loadStats()
+    }
+
+    window.addEventListener('statsUpdated', handleStatsUpdate)
+    
+    return () => {
+      window.removeEventListener('statsUpdated', handleStatsUpdate)
+    }
+  }, [user?.id])
 
   const statsData = [
     {

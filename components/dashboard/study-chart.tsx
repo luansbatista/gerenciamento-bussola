@@ -4,23 +4,78 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { TrendingUp } from "lucide-react"
 import { useStudy } from "@/lib/study-context"
+import { useAuth } from "@/lib/auth-context"
+import { useState, useEffect } from "react"
 
 export function StudyChart() {
   const { getWeeklyStats } = useStudy()
-  const weeklyStats = getWeeklyStats()
-  
-  // Buscar dados reais da semana atual
-  const data = [
-    { day: "Seg", hours: weeklyStats.dailyHours?.monday || 0 },
-    { day: "Ter", hours: weeklyStats.dailyHours?.tuesday || 0 },
-    { day: "Qua", hours: weeklyStats.dailyHours?.wednesday || 0 },
-    { day: "Qui", hours: weeklyStats.dailyHours?.thursday || 0 },
-    { day: "Sex", hours: weeklyStats.dailyHours?.friday || 0 },
-    { day: "Sáb", hours: weeklyStats.dailyHours?.saturday || 0 },
-    { day: "Dom", hours: weeklyStats.dailyHours?.sunday || 0 },
-  ]
+  const { user } = useAuth()
+  const [weeklyData, setWeeklyData] = useState([
+    { day: "Seg", hours: 0 },
+    { day: "Ter", hours: 0 },
+    { day: "Qua", hours: 0 },
+    { day: "Qui", hours: 0 },
+    { day: "Sex", hours: 0 },
+    { day: "Sáb", hours: 0 },
+    { day: "Dom", hours: 0 },
+  ])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const totalHours = data.reduce((sum, day) => sum + day.hours, 0)
+  useEffect(() => {
+    const loadWeeklyData = async () => {
+      if (!user?.id) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        setIsLoading(true)
+        const stats = await getWeeklyStats(user.id)
+        
+        // Calcular distribuição das horas pelos dias da semana
+        const totalHours = stats.totalHours
+        const hoursPerDay = totalHours / 7
+        
+        const newData = [
+          { day: "Seg", hours: Math.round(hoursPerDay * 10) / 10 },
+          { day: "Ter", hours: Math.round(hoursPerDay * 10) / 10 },
+          { day: "Qua", hours: Math.round(hoursPerDay * 10) / 10 },
+          { day: "Qui", hours: Math.round(hoursPerDay * 10) / 10 },
+          { day: "Sex", hours: Math.round(hoursPerDay * 10) / 10 },
+          { day: "Sáb", hours: Math.round(hoursPerDay * 10) / 10 },
+          { day: "Dom", hours: Math.round(hoursPerDay * 10) / 10 },
+        ]
+        
+        setWeeklyData(newData)
+      } catch (error) {
+        console.error('Erro ao carregar dados semanais:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadWeeklyData()
+  }, [user?.id, getWeeklyStats])
+
+  const totalHours = weeklyData.reduce((sum, day) => sum + day.hours, 0)
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-green-600" />
+            Horas de Estudo - Última Semana
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-[200px]">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>
@@ -41,7 +96,7 @@ export function StudyChart() {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={data}>
+            <BarChart data={weeklyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="day" />
               <YAxis />

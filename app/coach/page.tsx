@@ -168,7 +168,7 @@ export default function CoachPage() {
         const subjects = await getSubjects()
         setAvailableSubjects(subjects)
       } catch (error) {
-        console.error('Erro ao carregar disciplinas:', error)
+        // Silent error handling
         setAvailableSubjects([])
       }
     }
@@ -183,7 +183,7 @@ export default function CoachPage() {
         const stats = await getWeeklyStats()
         setWeeklyStats(stats)
       } catch (error) {
-        console.error('Erro ao carregar estatísticas semanais:', error)
+        // Silent error handling
         setWeeklyStats({ totalHours: 0, totalQuestions: 0, accuracy: 0 })
       }
     }

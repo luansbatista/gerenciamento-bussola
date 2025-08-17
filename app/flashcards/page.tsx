@@ -26,7 +26,6 @@ export default function FlashcardsPage() {
           .order('disciplina')
         
         if (error) {
-          console.error('Erro ao buscar disciplinas:', error)
           return
         }
 
@@ -38,7 +37,7 @@ export default function FlashcardsPage() {
           })))
         }
       } catch (error) {
-        console.error('Erro ao buscar disciplinas:', error)
+        // Silent error handling
       }
     }
 

@@ -93,10 +93,9 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       })) || []
 
       return rankingsList
-    } catch (error) {
-      console.error('Erro ao buscar ranking:', error)
-      return []
-    }
+          } catch (error) {
+        return []
+      }
   }
 
   const getQuestionStats = async (userId?: string): Promise<QuestionStats> => {
@@ -109,7 +108,6 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!currentUserId) {
-      console.warn('getQuestionStats - Usuário não encontrado')
       return {
         totalAnswered: 0,
         correctAnswers: 0,
@@ -177,9 +175,8 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         averageTime: 2.5,
         subjectBreakdown: breakdown
       }
-    } catch (error) {
-      console.error('Erro ao buscar estatísticas de questões:', error)
-      return {
+          } catch (error) {
+        return {
         totalAnswered: 0,
         correctAnswers: 0,
         accuracy: 0,
@@ -199,7 +196,6 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!currentUserId) {
-      console.warn('getStudyAnalytics - Usuário não encontrado')
       return {
         dailyQuestions: [0, 0, 0, 0, 0, 0, 0],
         weeklyHours: [0, 0, 0, 0, 0, 0, 0],
@@ -265,9 +261,8 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         subjectDistribution,
         performanceTrend: "stable"
       }
-    } catch (error) {
-      console.error('Erro ao buscar analytics de estudo:', error)
-      return {
+          } catch (error) {
+        return {
         dailyQuestions: [0, 0, 0, 0, 0, 0, 0],
         weeklyHours: [0, 0, 0, 0, 0, 0, 0],
         monthlyProgress: [],

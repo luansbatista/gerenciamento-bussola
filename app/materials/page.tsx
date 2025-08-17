@@ -1,336 +1,405 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { FolderOpen, Search, Upload, Filter, Download, FileText, Shield } from "lucide-react"
+import { 
+  FolderOpen, 
+  Upload, 
+  FileText, 
+  Video, 
+  Image, 
+  Download, 
+  Plus, 
+  Search,
+  Filter,
+  Calendar,
+  User
+} from "lucide-react"
+import { createClient } from "@/utils/supabase/client"
 import { useAuth } from "@/lib/auth-context"
+import { useSidebar } from "@/lib/sidebar-context"
 
 interface Material {
   id: string
   title: string
-  description: string
-  subject: string
-  fileUrl: string
-  fileName: string
-  fileSize: string
-  uploadedBy: string
-  uploadedAt: string
-  downloads: number
+  description: string | null
+  subject: string | null
+  file_url: string | null
+  file_type: string | null
+  created_by: string
+  created_at: string
 }
 
-const subjects = [
-  "Todas as Disciplinas",
-  "Direito Constitucional",
-  "Direito Penal",
-  "Direito Processual Penal",
-  "Legislação Específica PM",
-  "Português",
-  "Matemática",
-  "Conhecimentos Gerais",
-]
-
 export default function MaterialsPage() {
+  const { isCollapsed } = useSidebar()
   const { user } = useAuth()
+  const supabase = createClient()
+  
   const [materials, setMaterials] = useState<Material[]>([])
-  const [selectedSubject, setSelectedSubject] = useState("Todas as Disciplinas")
+  const [subjects, setSubjects] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [showUploadForm, setShowUploadForm] = useState(false)
+  const [selectedSubject, setSelectedSubject] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
-  const [showUploadModal, setShowUploadModal] = useState(false)
-  const [uploadForm, setUploadForm] = useState({
+  
+  const [newMaterial, setNewMaterial] = useState({
     title: "",
     description: "",
     subject: "",
-    file: null as File | null,
+    file_url: "",
+    file_type: ""
   })
 
-  const isAdmin = user?.email === "admin@pmba.com"
+  // Carregar materiais do banco
+  useEffect(() => {
+    const fetchMaterials = async () => {
+      try {
+        setIsLoading(true)
+        
+        const { data, error } = await supabase
+          .from('materials')
+          .select('*')
+          .order('created_at', { ascending: false })
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file && file.type === "application/pdf") {
-      setUploadForm({ ...uploadForm, file })
-    } else {
-      alert("Por favor, selecione apenas arquivos PDF")
+        if (error) {
+          console.error('Erro ao carregar materiais:', error)
+          return
+        }
+
+        setMaterials(data || [])
+        
+        // Extrair disciplinas únicas
+        const uniqueSubjects = Array.from(new Set(
+          data?.map(m => m.subject).filter(Boolean) || []
+        ))
+        setSubjects(uniqueSubjects)
+      } catch (error) {
+        console.error('Erro ao carregar materiais:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchMaterials()
+  }, [supabase])
+
+  const handleUploadMaterial = async () => {
+    if (!user?.id || !newMaterial.title || !newMaterial.subject) {
+      alert('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('materials')
+        .insert({
+          title: newMaterial.title,
+          description: newMaterial.description || null,
+          subject: newMaterial.subject,
+          file_url: newMaterial.file_url || null,
+          file_type: newMaterial.file_type || null,
+          created_by: user.id
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Erro ao enviar material:', error)
+        alert('Erro ao enviar material')
+        return
+      }
+
+      // Adicionar à lista
+      setMaterials(prev => [data, ...prev])
+      
+      // Limpar formulário
+      setNewMaterial({
+        title: "",
+        description: "",
+        subject: "",
+        file_url: "",
+        file_type: ""
+      })
+      setShowUploadForm(false)
+      
+      alert('Material enviado com sucesso!')
+    } catch (error) {
+      console.error('Erro ao enviar material:', error)
+      alert('Erro ao enviar material')
     }
   }
 
-  const handleUpload = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!uploadForm.title || !uploadForm.subject || !uploadForm.file) return
-
-    const newMaterial: Material = {
-      id: Date.now().toString(),
-      title: uploadForm.title,
-      description: uploadForm.description,
-      subject: uploadForm.subject,
-      fileUrl: URL.createObjectURL(uploadForm.file),
-      fileName: uploadForm.file.name,
-      fileSize: (uploadForm.file.size / 1024 / 1024).toFixed(2) + " MB",
-      uploadedBy: user?.name || "Admin",
-      uploadedAt: new Date().toISOString(),
-      downloads: 0,
-    }
-
-    setMaterials((prev) => [...prev, newMaterial])
-    setUploadForm({ title: "", description: "", subject: "", file: null })
-    setShowUploadModal(false)
+  const getFileIcon = (fileType: string | null) => {
+    if (!fileType) return <FileText className="h-6 w-6" />
+    
+    if (fileType.includes('pdf')) return <FileText className="h-6 w-6 text-red-500" />
+    if (fileType.includes('video')) return <Video className="h-6 w-6 text-blue-500" />
+    if (fileType.includes('image')) return <Image className="h-6 w-6 text-green-500" />
+    
+    return <FileText className="h-6 w-6" />
   }
 
-  const handleDownload = (material: Material) => {
-    // Increment download count
-    setMaterials((prev) => prev.map((m) => (m.id === material.id ? { ...m, downloads: m.downloads + 1 } : m)))
-
-    // Create download link
-    const link = document.createElement("a")
-    link.href = material.fileUrl
-    link.download = material.fileName
-    link.click()
-  }
-
-  const filteredMaterials = materials.filter((material) => {
-    const matchesSubject = selectedSubject === "Todas as Disciplinas" || material.subject === selectedSubject
-    const matchesSearch =
-      material.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      material.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredMaterials = materials.filter(material => {
+    const matchesSubject = selectedSubject === "all" || material.subject === selectedSubject
+    const matchesSearch = material.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (material.description && material.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    
     return matchesSubject && matchesSearch
   })
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR')
+  }
+
   return (
-    <div>
-      <div className="relative bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white overflow-hidden">
+    <div className="min-h-screen">
+      {/* Header com gradiente */}
+      <div className="relative bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white overflow-hidden">
         <div className="absolute inset-0 bg-black/10"></div>
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/20 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-transparent"></div>
 
         <div className="relative px-8 py-12 animate-fade-in-up">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg animate-bounce-subtle">
-                <FolderOpen className="h-8 w-8" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-emerald-100 bg-clip-text text-transparent">
-                  Materiais de Estudo
-                </h1>
-                <p className="text-emerald-100 text-lg mt-2">
-                  Acesse e organize seus materiais de preparação para a PMBA
-                </p>
-              </div>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg animate-bounce-subtle">
+              <FolderOpen className="h-8 w-8" />
             </div>
-            {isAdmin && (
-              <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
-                <DialogTrigger asChild>
-                  <Button className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Adicionar Material
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                      <Shield className="h-5 w-5 text-emerald-600" />
-                      Adicionar Novo Material (Admin)
-                    </DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleUpload} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Título do Material</Label>
-                        <Input
-                          placeholder="Ex: Resumo Direito Constitucional"
-                          value={uploadForm.title}
-                          onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Disciplina</Label>
-                        <Select
-                          value={uploadForm.subject}
-                          onValueChange={(value) => setUploadForm({ ...uploadForm, subject: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione a disciplina" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {subjects.slice(1).map((subject) => (
-                              <SelectItem key={subject} value={subject}>
-                                {subject}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Descrição</Label>
-                      <Textarea
-                        placeholder="Descreva o conteúdo do material..."
-                        value={uploadForm.description}
-                        onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Arquivo PDF</Label>
-                      <Input type="file" accept=".pdf" onChange={handleFileUpload} />
-                      {uploadForm.file && (
-                        <p className="text-sm text-muted-foreground">Arquivo selecionado: {uploadForm.file.name}</p>
-                      )}
-                    </div>
-                    <div className="flex gap-2 pt-4">
-                      <Button type="submit" className="bg-gradient-to-r from-emerald-600 to-teal-600">
-                        Adicionar Material
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => setShowUploadModal(false)}>
-                        Cancelar
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )}
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                Materiais de Estudo
+              </h1>
+              <p className="text-purple-100 text-lg mt-2">
+                Acesse e compartilhe materiais complementares para seus estudos
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 p-8 space-y-8">
+      <div className="p-8 space-y-8">
         {/* Filtros e Busca */}
-        <Card className="shadow-soft border-0 animate-fade-in-up animation-delay-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5 text-emerald-600" />
-              Filtros e Busca
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Disciplina</label>
-                <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subjects.map((subject) => (
-                      <SelectItem key={subject} value={subject}>
-                        {subject}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Buscar Material</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Digite o nome do material..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Status</label>
-                <div className="flex items-center gap-2 pt-2">
-                  {isAdmin ? (
-                    <Badge className="bg-green-100 text-green-800">
-                      <Shield className="h-3 w-3 mr-1" />
-                      Administrador
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary">Visualização</Badge>
-                  )}
-                </div>
-              </div>
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="flex flex-col md:flex-row gap-4 flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Buscar materiais..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full md:w-80"
+              />
             </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">Materiais Disponíveis ({filteredMaterials.length})</h2>
-            <Badge variant="secondary" className="text-sm">
-              {selectedSubject}
-            </Badge>
+            
+            <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Todas as disciplinas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as disciplinas</SelectItem>
+                {subjects.map(subject => (
+                  <SelectItem key={subject} value={subject}>
+                    {subject}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {filteredMaterials.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredMaterials.map((material, index) => (
-                <Card
-                  key={material.id}
-                  className="shadow-soft border-0 hover:shadow-lg hover:scale-105 transition-all duration-300 animate-fade-in-up"
-                  style={{ animationDelay: `${index * 100}ms` }}
+          <Button
+            onClick={() => setShowUploadForm(!showUploadForm)}
+            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Enviar Material
+          </Button>
+        </div>
+
+        {/* Formulário de Upload */}
+        {showUploadForm && (
+          <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-purple-600" />
+                Enviar Novo Material
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="title">Título *</Label>
+                  <Input
+                    id="title"
+                    value={newMaterial.title}
+                    onChange={(e) => setNewMaterial(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Título do material"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="subject">Disciplina *</Label>
+                  <Select 
+                    value={newMaterial.subject} 
+                    onValueChange={(value) => setNewMaterial(prev => ({ ...prev, subject: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a disciplina" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Português">Português</SelectItem>
+                      <SelectItem value="Matemática">Matemática</SelectItem>
+                      <SelectItem value="História do Brasil">História do Brasil</SelectItem>
+                      <SelectItem value="Geografia do Brasil">Geografia do Brasil</SelectItem>
+                      <SelectItem value="Direito Constitucional">Direito Constitucional</SelectItem>
+                      <SelectItem value="Direito Administrativo">Direito Administrativo</SelectItem>
+                      <SelectItem value="Direito Penal">Direito Penal</SelectItem>
+                      <SelectItem value="Informática">Informática</SelectItem>
+                      <SelectItem value="Atualidades">Atualidades</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="description">Descrição</Label>
+                <Textarea
+                  id="description"
+                  value={newMaterial.description}
+                  onChange={(e) => setNewMaterial(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Descrição do material..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="file_url">URL do Arquivo</Label>
+                  <Input
+                    id="file_url"
+                    value={newMaterial.file_url}
+                    onChange={(e) => setNewMaterial(prev => ({ ...prev, file_url: e.target.value }))}
+                    placeholder="https://..."
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="file_type">Tipo de Arquivo</Label>
+                  <Select 
+                    value={newMaterial.file_type} 
+                    onValueChange={(value) => setNewMaterial(prev => ({ ...prev, file_type: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pdf">PDF</SelectItem>
+                      <SelectItem value="video">Vídeo</SelectItem>
+                      <SelectItem value="image">Imagem</SelectItem>
+                      <SelectItem value="document">Documento</SelectItem>
+                      <SelectItem value="presentation">Apresentação</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={handleUploadMaterial} className="flex-1">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Enviar Material
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowUploadForm(false)}
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-emerald-600" />
-                        <Badge variant="outline" className="text-xs">
-                          {material.subject}
-                        </Badge>
+                  Cancelar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Lista de Materiais */}
+        {isLoading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Carregando materiais...</p>
+          </div>
+        ) : filteredMaterials.length === 0 ? (
+          <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+            <CardContent className="text-center py-12">
+              <FolderOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhum material encontrado</h3>
+              <p className="text-gray-600 mb-4">
+                {searchTerm || selectedSubject !== "all" 
+                  ? "Tente ajustar os filtros de busca" 
+                  : "Seja o primeiro a compartilhar um material!"
+                }
+              </p>
+              {!searchTerm && selectedSubject === "all" && (
+                <Button onClick={() => setShowUploadForm(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Enviar Primeiro Material
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredMaterials.map((material) => (
+              <Card key={material.id} className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      {getFileIcon(material.file_type)}
+                      <div>
+                        <CardTitle className="text-lg">{material.title}</CardTitle>
+                        {material.subject && (
+                          <Badge variant="secondary" className="mt-1">
+                            {material.subject}
+                          </Badge>
+                        )}
                       </div>
-                      <span className="text-xs text-muted-foreground">{material.fileSize}</span>
                     </div>
-                    <CardTitle className="text-lg">{material.title}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{material.description}</p>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Por: {material.uploadedBy}</span>
-                      <span>{material.downloads} downloads</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {material.description && (
+                    <p className="text-gray-600 text-sm line-clamp-3">
+                      {material.description}
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {formatDate(material.created_at)}
                     </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Adicionado: {new Date(material.uploadedAt).toLocaleDateString("pt-BR")}</span>
+                    <div className="flex items-center gap-1">
+                      <User className="h-3 w-3" />
+                      Usuário
                     </div>
-                    <Button
-                      onClick={() => handleDownload(material)}
-                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                  </div>
+
+                  {material.file_url && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => window.open(material.file_url, '_blank')}
                     >
                       <Download className="h-4 w-4 mr-2" />
-                      Download PDF
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card className="shadow-soft border-0 animate-fade-in-up animation-delay-400">
-              <CardContent className="text-center py-16">
-                <div className="max-w-md mx-auto">
-                  <div className="p-4 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-                    <FolderOpen className="h-10 w-10 text-emerald-600" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Nenhum material disponível</h3>
-                  <p className="text-muted-foreground mb-6">
-                    {isAdmin
-                      ? "Comece adicionando os primeiros materiais de estudo para a PMBA."
-                      : "Os materiais de estudo serão disponibilizados pelos administradores."}
-                  </p>
-                  {isAdmin && (
-                    <Button
-                      onClick={() => setShowUploadModal(true)}
-                      className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Adicionar Primeiro Material
+                      Acessar Material
                     </Button>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

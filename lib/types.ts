@@ -17,19 +17,31 @@ export interface Subject {
   id: string
   name: string
   color: string
-  totalQuestions: number
+  totalQuestions?: number
 }
 
 export interface Question {
   id: string
-  subjectId: string
-  question: string
-  options: string[]
-  correctAnswer: number
-  explanation: string
-  difficulty: "easy" | "medium" | "hard"
-  year?: number
-  institution?: string
+  disciplina?: string
+  subject?: string
+  assunto?: string
+  question?: string
+  enunciado?: string
+  opcao_a?: string
+  opcao_b?: string
+  opcao_c?: string
+  opcao_d?: string
+  opcao_e?: string // Coluna do CSV
+  alternativa_correta?: string
+  correct_answer?: string
+  difficulty?: string
+  nivel?: string
+  times_answered?: number
+  accuracy_rate?: number
+  created_at?: string
+  // Campos para compatibilidade com componentes existentes
+  options?: string[]
+  correctAnswer?: string
 }
 
 export interface StudySession {

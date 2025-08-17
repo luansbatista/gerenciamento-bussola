@@ -40,9 +40,9 @@ export function FlashcardProvider({ children }: { children: ReactNode }) {
     if (saved) {
       try {
         setFlashcards(JSON.parse(saved))
-      } catch (error) {
-        console.error("Error loading flashcards:", error)
-      }
+          } catch (error) {
+      // Silent error handling
+    }
     }
   }, [])
 

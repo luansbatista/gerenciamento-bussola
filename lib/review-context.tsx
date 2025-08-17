@@ -80,9 +80,9 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
     if (saved) {
       try {
         setReviewItems(JSON.parse(saved))
-      } catch (error) {
-        console.error("Error loading review items:", error)
-      }
+          } catch (error) {
+      // Silent error handling
+    }
     }
   }, [])
 

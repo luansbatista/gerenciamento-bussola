@@ -118,8 +118,8 @@ export function CoachProvider({ children }: { children: ReactNode }) {
 
     // Generate new recommendations after studying
     setTimeout(() => {
-      generateRecommendations().catch(error => {
-        console.error('Erro ao gerar recomendações:', error)
+      generateRecommendations().catch(() => {
+        // Silent error handling
       })
     }, 100)
   }

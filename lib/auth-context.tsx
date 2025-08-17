@@ -26,75 +26,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check current session
     const checkAuth = async () => {
-      console.log('AuthContext - Iniciando verificação de autenticação')
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
-          console.error("Error getting session:", error)
           setIsLoading(false)
           return
         }
 
-        console.log('AuthContext - Sessão encontrada:', !!session?.user)
-
         if (session?.user) {
-          try {
-            // Get user profile with admin status
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single()
+          // Buscar dados do perfil para verificar se é admin
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role, is_admin, avatar, avatar_url, full_name')
+            .eq('id', session.user.id)
+            .single()
 
-            if (profileError) {
-              console.error("Error getting profile:", profileError.message || profileError)
-              // If it's an RLS error, we'll create a default profile
-              if (profileError.message && profileError.message.includes('infinite recursion')) {
-                console.warn("RLS recursion detected, using default profile")
-              }
-            }
-
-            const userData: User = {
-              id: session.user.id,
-              name: profile?.name || session.user.user_metadata?.name || 'Usuário',
-              email: session.user.email || '',
-              avatar: profile?.avatar_url || session.user.user_metadata?.avatar_url || "/abstract-profile.png",
-              createdAt: new Date(session.user.created_at),
-              studyGoal: profile?.study_goal || 4,
-              currentStreak: profile?.current_streak || 0,
-              totalStudyHours: profile?.total_study_hours || 0,
-              isAdmin: profile?.is_admin || false,
-              role: session.user.user_metadata?.role || 'student'
-            }
-
-            console.log('AuthContext - Usuário definido:', userData)
-            setUser(userData)
-          } catch (profileError) {
-            console.error("Error getting profile:", profileError)
-            // Create user data without profile
-            const userData: User = {
-              id: session.user.id,
-              name: session.user.user_metadata?.name || 'Usuário',
-              email: session.user.email || '',
-              avatar: session.user.user_metadata?.avatar_url || "/abstract-profile.png",
-              createdAt: new Date(session.user.created_at),
-              studyGoal: 4,
-              currentStreak: 0,
-              totalStudyHours: 0,
-              isAdmin: false,
-              role: session.user.user_metadata?.role || 'student'
-            }
-            console.log('AuthContext - Usuário definido (sem perfil):', userData)
-            setUser(userData)
+          // Create user data with profile data
+          const userData: User = {
+            id: session.user.id,
+            name: profile?.full_name || session.user.user_metadata?.name || 'Usuário',
+            email: session.user.email || '',
+            avatar: profile?.avatar || profile?.avatar_url || session.user.user_metadata?.avatar_url || "/abstract-profile.png",
+            createdAt: new Date(session.user.created_at),
+            studyGoal: 4,
+            currentStreak: 0,
+            totalStudyHours: 0,
+            isAdmin: profile?.is_admin === true || profile?.role === 'admin',
+            role: profile?.role || session.user.user_metadata?.role || 'student'
           }
-        } else {
-          console.log('AuthContext - Nenhuma sessão encontrada')
+          setUser(userData)
         }
       } catch (error) {
-        console.error("Auth check error:", error)
+        // Silently handle auth errors
       } finally {
-        console.log('AuthContext - Finalizando verificação de autenticação')
         setIsLoading(false)
       }
     }
@@ -105,53 +70,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
-          try {
-            // Get user profile with admin status
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single()
+          // Buscar dados do perfil para verificar se é admin
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role, is_admin, avatar, avatar_url, full_name')
+            .eq('id', session.user.id)
+            .single()
 
-            if (profileError) {
-              console.error("Error getting profile in auth change:", profileError.message || profileError)
-              // If it's an RLS error, we'll create a default profile
-              if (profileError.message && profileError.message.includes('infinite recursion')) {
-                console.warn("RLS recursion detected in auth change, using default profile")
-              }
-            }
-
-            const userData: User = {
-              id: session.user.id,
-              name: profile?.name || session.user.user_metadata?.name || 'Usuário',
-              email: session.user.email || '',
-              avatar: profile?.avatar_url || session.user.user_metadata?.avatar_url || "/abstract-profile.png",
-              createdAt: new Date(session.user.created_at),
-              studyGoal: profile?.study_goal || 4,
-              currentStreak: profile?.current_streak || 0,
-              totalStudyHours: profile?.total_study_hours || 0,
-              isAdmin: profile?.is_admin || false,
-              role: session.user.user_metadata?.role || 'student'
-            }
-
-            setUser(userData)
-          } catch (profileError) {
-            console.error("Error getting profile in auth change:", profileError)
-            // Create user data without profile
-            const userData: User = {
-              id: session.user.id,
-              name: session.user.user_metadata?.name || 'Usuário',
-              email: session.user.email || '',
-              avatar: session.user.user_metadata?.avatar_url || "/abstract-profile.png",
-              createdAt: new Date(session.user.created_at),
-              studyGoal: 4,
-              currentStreak: 0,
-              totalStudyHours: 0,
-              isAdmin: false,
-              role: session.user.user_metadata?.role || 'student'
-            }
-            setUser(userData)
+          // Create user data with profile data
+          const userData: User = {
+            id: session.user.id,
+            name: profile?.full_name || session.user.user_metadata?.name || 'Usuário',
+            email: session.user.email || '',
+            avatar: profile?.avatar || profile?.avatar_url || session.user.user_metadata?.avatar_url || "/abstract-profile.png",
+            createdAt: new Date(session.user.created_at),
+            studyGoal: 4,
+            currentStreak: 0,
+            totalStudyHours: 0,
+            isAdmin: profile?.is_admin === true || profile?.role === 'admin',
+            role: profile?.role || session.user.user_metadata?.role || 'student'
           }
+          setUser(userData)
         } else if (event === 'SIGNED_OUT') {
           setUser(null)
         }

@@ -98,44 +98,67 @@ export function QuestionCard({ question, selectedAnswer, showExplanation, onAnsw
       <CardContent className="space-y-4">
         {/* Answer Options */}
         <div className="space-y-3">
-          {question.options.map((option, index) => {
-            const isSelected = selectedAnswer === index
-            const isCorrect = index === question.correct_answer
-            const isWrong = isSelected && !isCorrect && showExplanation
+          {(() => {
+            // Criar array de opções a partir das colunas individuais
+            const options = []
+            if (question.opcao_a && question.opcao_a.trim()) options.push(question.opcao_a)
+            if (question.opcao_b && question.opcao_b.trim()) options.push(question.opcao_b)
+            if (question.opcao_c && question.opcao_c.trim()) options.push(question.opcao_c)
+            if (question.opcao_d && question.opcao_d.trim()) options.push(question.opcao_d)
+            if (question.opcao_e && question.opcao_e.trim()) options.push(question.opcao_e)
+            
+            // Se não há opções individuais, usar o array options
+            const finalOptions = options.length > 0 ? options : (question.options || [])
+            
+            if (finalOptions.length > 0) {
+              return finalOptions.map((option, index) => {
+                const isSelected = selectedAnswer === index
+                // Verificar se a resposta está correta usando ambas as colunas possíveis
+                const correctAnswer = question.correct_answer || question.alternativa_correta
+                const isCorrect = String.fromCharCode(97 + index) === String(correctAnswer || '').toLowerCase()
+                const isWrong = isSelected && !isCorrect && showExplanation
 
-            let buttonVariant: "default" | "outline" | "destructive" = "outline"
-            let buttonClass = ""
+                let buttonVariant: "default" | "outline" | "destructive" = "outline"
+                let buttonClass = ""
 
-            if (showExplanation) {
-              if (isCorrect) {
-                buttonVariant = "default"
-                buttonClass = "bg-green-500 hover:bg-green-600 text-white border-green-500"
-              } else if (isWrong) {
-                buttonVariant = "destructive"
-              }
-            } else if (isSelected) {
-              buttonVariant = "default"
-            }
+                if (showExplanation) {
+                  if (isCorrect) {
+                    buttonVariant = "default"
+                    buttonClass = "bg-green-500 hover:bg-green-600 text-white border-green-500"
+                  } else if (isWrong) {
+                    buttonVariant = "destructive"
+                  }
+                } else if (isSelected) {
+                  buttonVariant = "default"
+                }
 
-            return (
-              <Button
-                key={index}
-                variant={buttonVariant}
-                className={`w-full justify-start text-left h-auto p-4 ${buttonClass}`}
-                onClick={() => !showExplanation && onAnswer(index)}
-                disabled={showExplanation}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center h-6 w-6 rounded-full bg-white/20 text-sm font-medium">
-                    {String.fromCharCode(65 + index)}
-                  </div>
-                  <span className="flex-1">{option}</span>
-                  {showExplanation && isCorrect && <CheckCircle className="h-5 w-5" />}
-                  {showExplanation && isWrong && <XCircle className="h-5 w-5" />}
+                return (
+                  <Button
+                    key={index}
+                    variant={buttonVariant}
+                    className={`w-full justify-start text-left h-auto p-4 ${buttonClass}`}
+                    onClick={() => !showExplanation && onAnswer(index)}
+                    disabled={showExplanation}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center h-6 w-6 rounded-full bg-white/20 text-sm font-medium">
+                        {String.fromCharCode(65 + index)}
+                      </div>
+                      <span className="flex-1">{option}</span>
+                      {showExplanation && isCorrect && <CheckCircle className="h-5 w-5" />}
+                      {showExplanation && isWrong && <XCircle className="h-5 w-5" />}
+                    </div>
+                  </Button>
+                )
+              })
+            } else {
+              return (
+                <div className="text-center py-4 text-gray-500">
+                  <p>Nenhuma opção disponível para esta questão</p>
                 </div>
-              </Button>
-            )
-          })}
+              )
+            }
+          })()}
         </div>
 
         {!showExplanation && (
@@ -151,7 +174,13 @@ export function QuestionCard({ question, selectedAnswer, showExplanation, onAnsw
           <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <h4 className="font-medium text-blue-900 mb-2">Explicação:</h4>
             <p className="text-blue-800 leading-relaxed">
-              {question.alternativa_correta ? `Alternativa correta: ${question.alternativa_correta}` : 'Explicação não disponível'}
+              {(() => {
+                const correctAnswer = question.correct_answer || question.alternativa_correta
+                if (correctAnswer) {
+                  return `Alternativa correta: ${String(correctAnswer).toUpperCase()}`
+                }
+                return 'Explicação não disponível'
+              })()}
             </p>
           </div>
         )}

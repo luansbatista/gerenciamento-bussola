@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import { usePomodoro } from "./pomodoro-context"
 import { createClient } from "@/utils/supabase/client"
 
@@ -39,6 +39,7 @@ interface StudyContextType {
   getWeeklyStats: (userId?: string) => Promise<{ totalHours: number; totalQuestions: number; accuracy: number }>
   getSubjectProgress: (subject: string, userId?: string) => Promise<{ hours: number; questions: number; accuracy: number }>
   getSubjects: () => Promise<{ id: string; name: string; color: string }[]>
+  refreshStats: () => void
 }
 
 const StudyContext = createContext<StudyContextType | undefined>(undefined)
@@ -194,7 +195,6 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   }
 
   const getWeeklyStats = async (userId?: string) => {
-    console.log('StudyContext - getWeeklyStats iniciado para usuário:', userId)
     try {
       const supabase = createClient()
       
@@ -206,11 +206,8 @@ export function StudyProvider({ children }: { children: ReactNode }) {
       }
 
       if (!currentUserId) {
-        console.warn('StudyContext - getWeeklyStats: Nenhum usuário fornecido')
         return { totalHours: 0, totalQuestions: 0, accuracy: 0 }
       }
-
-      console.log('StudyContext - getWeeklyStats: Buscando tentativas para usuário:', currentUserId)
 
       const { data: attempts, error } = await supabase
         .from('question_attempts')
@@ -219,14 +216,10 @@ export function StudyProvider({ children }: { children: ReactNode }) {
         .gte('attempted_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
 
       if (error) {
-        console.error('StudyContext - getWeeklyStats: Erro ao buscar tentativas:', error)
         return { totalHours: 0, totalQuestions: 0, accuracy: 0 }
       }
 
-      console.log('StudyContext - getWeeklyStats: Tentativas encontradas:', attempts?.length || 0)
-
       if (!attempts || !Array.isArray(attempts)) {
-        console.warn('StudyContext - getWeeklyStats: Dados de tentativas não encontrados ou formato inválido')
         return { totalHours: 0, totalQuestions: 0, accuracy: 0 }
       }
 
@@ -235,147 +228,134 @@ export function StudyProvider({ children }: { children: ReactNode }) {
       const accuracy = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0
       const totalHours = totalQuestions * 2 / 60 // Estimativa: 2 minutos por questão
 
-      const result = { totalHours, totalQuestions, accuracy }
-      console.log('StudyContext - getWeeklyStats: Resultado:', result)
-      return result
+      return { totalHours, totalQuestions, accuracy }
     } catch (error) {
-      console.error('StudyContext - getWeeklyStats: Erro geral:', error)
       return { totalHours: 0, totalQuestions: 0, accuracy: 0 }
     }
   }
 
-  const getSubjectProgress = async (subject: string, userId?: string) => {
+  const getSubjectProgress = useCallback(async (subject: string, userId?: string) => {
     try {
       const supabase = createClient()
       
-      // Se não foi passado userId, tentar obter do auth
       let currentUserId = userId
       if (!currentUserId) {
         const { data: { user } } = await supabase.auth.getUser()
         currentUserId = user?.id
       }
-
-      console.log('getSubjectProgress - Buscando progresso para matéria:', subject, 'usuário:', currentUserId)
-
+      
       if (!currentUserId) {
-        console.warn('getSubjectProgress - Usuário não encontrado')
         return { hours: 0, questions: 0, accuracy: 0 }
       }
-
-      // Buscar tentativas de questões por matéria do usuário atual
+      
+      // Buscar questões da matéria usando disciplina ou subject
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('questions')
+        .select('id')
+        .or('disciplina.eq.' + subject + ',subject.eq.' + subject)
+      
+      if (questionsError) {
+        return { hours: 0, questions: 0, accuracy: 0 }
+      }
+      
+      if (!questionsData || questionsData.length === 0) {
+        return { hours: 0, questions: 0, accuracy: 0 }
+      }
+      
+      // Pegar os IDs das questões
+      const questionIds = questionsData.map(q => q.id)
+      
+      // Agora buscar as tentativas do usuário para essas questões
       const { data: attempts, error } = await supabase
         .from('question_attempts')
-        .select(`
-          *,
-          questions!inner(
-            subject_id,
-            subjects!inner(name)
-          )
-        `)
+        .select('*')
         .eq('user_id', currentUserId)
-        .eq('questions.subjects.name', subject)
-
+        .in('question_id', questionIds)
+      
       if (error) {
-        console.error('Erro ao buscar progresso da matéria:', error)
         return { hours: 0, questions: 0, accuracy: 0 }
       }
-
-      console.log('getSubjectProgress - Tentativas encontradas para', subject, ':', attempts)
-
-      // Verificar se attempts existe e é um array
+      
       if (!attempts || !Array.isArray(attempts)) {
-        console.warn('Dados de tentativas não encontrados ou formato inválido para', subject)
         return { hours: 0, questions: 0, accuracy: 0 }
       }
-
+      
       const questions = attempts.length
       const correct = attempts.filter(a => a.is_correct).length
       const accuracy = questions > 0 ? (correct / questions) * 100 : 0
-
-      // Calcular horas de estudo (estimativa baseada em tempo médio por questão)
-      const hours = questions * 2 / 60 // 2 minutos por questão
-
-      console.log('getSubjectProgress - Resultados para', subject, ':', { hours, questions, accuracy })
-
+      
+      const hours = questions * 2 / 60
+      
       return { hours, questions, accuracy }
     } catch (error) {
-      console.error('Erro ao buscar progresso da matéria:', error)
       return { hours: 0, questions: 0, accuracy: 0 }
     }
-  }
+  }, [])
 
-  const getSubjects = async () => {
-    console.log('StudyContext - getSubjects iniciado')
+  const getSubjects = useCallback(async () => {
     try {
       const supabase = createClient()
       
-      console.log('StudyContext - getSubjects: Fazendo consulta ao banco...')
+      // Primeiro, tentar buscar da tabela subjects
+      const { data: subjectsData, error: subjectsError } = await supabase
+        .from('subjects')
+        .select('*')
+        .order('name')
       
-      // Buscar disciplinas que realmente existem através das questões cadastradas
+      if (!subjectsError && subjectsData && subjectsData.length > 0) {
+        // Se subjects tem dados, usar subjects
+        const subjects = subjectsData.map((subject: any) => ({
+          id: subject.id,
+          name: subject.name,
+          color: subject.color || '#3B82F6'
+        }))
+        
+        return subjects
+      }
+      
+      // Se subjects não tem dados, buscar da tabela questions
       const { data: questionsData, error: questionsError } = await supabase
         .from('questions')
-        .select(`
-          subject_id,
-          subjects!inner(
-            id,
-            name,
-            color
-          )
-        `)
-        .not('subject_id', 'is', null)
-
-      console.log('StudyContext - getSubjects - Questões encontradas:', questionsData?.length || 0)
-      console.log('StudyContext - getSubjects - Erro (se houver):', questionsError)
-      console.log('StudyContext - getSubjects - Dados brutos (primeiros 3):', questionsData?.slice(0, 3))
-      console.log('StudyContext - getSubjects - Estrutura da primeira questão:', questionsData?.[0])
-
-      if (questionsError) {
-        console.error('Erro ao buscar questões:', questionsError)
-        console.error('Detalhes do erro:', {
-          message: questionsError.message,
-          details: questionsError.details,
-          hint: questionsError.hint,
-          code: questionsError.code
-        })
-        return []
-      }
-
-      if (!questionsData || !Array.isArray(questionsData) || questionsData.length === 0) {
-        console.warn('StudyContext - getSubjects: Nenhuma questão encontrada no banco')
-        return []
-      }
-
-      // Extrair disciplinas únicas baseadas nas questões cadastradas
-      const uniqueSubjects = new Map()
+        .select('disciplina, subject, assunto')
+        .or('disciplina.not.is.null,subject.not.is.null')
       
-      questionsData.forEach((question: any, index: number) => {
-        console.log(`StudyContext - getSubjects - Processando questão ${index + 1}:`, question)
-        if (question.subjects && question.subjects.id) {
-          const subject = question.subjects
-          console.log(`StudyContext - getSubjects - Disciplina encontrada:`, subject)
-          if (!uniqueSubjects.has(subject.id)) {
-            uniqueSubjects.set(subject.id, {
-              id: subject.id,
-              name: subject.name,
-              color: subject.color
-            })
-          }
-        } else {
-          console.warn(`StudyContext - getSubjects - Questão ${index + 1} sem disciplina válida:`, question)
+      if (questionsError) {
+        return []
+      }
+      
+      if (!questionsData || !Array.isArray(questionsData) || questionsData.length === 0) {
+        return []
+      }
+      
+      // Extrair disciplinas únicas das questões
+      const uniqueSubjects = new Set<string>()
+      
+      questionsData.forEach((question: any) => {
+        if (question.disciplina) {
+          uniqueSubjects.add(question.disciplina)
+        }
+        if (question.subject && question.subject !== question.disciplina) {
+          uniqueSubjects.add(question.subject)
         }
       })
-
-      const subjects = Array.from(uniqueSubjects.values())
-      console.log('StudyContext - getSubjects - Disciplinas únicas encontradas:', subjects)
-      console.log('StudyContext - getSubjects - Total de disciplinas:', subjects.length)
-
+      
+      const subjects = Array.from(uniqueSubjects).map((subjectName: string) => ({
+        id: subjectName, // Usar o nome como ID temporário
+        name: subjectName,
+        color: '#3B82F6' // Cor padrão
+      }))
+      
       return subjects
     } catch (error) {
-      console.error('Erro ao buscar disciplinas:', error)
-      console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
       return []
     }
-  }
+  }, [])
+
+  // Função para forçar atualização das estatísticas
+  const refreshStats = useCallback(() => {
+    // Disparar evento customizado para notificar outros componentes
+    window.dispatchEvent(new CustomEvent('statsUpdated'))
+  }, [])
 
   const value: StudyContextType = {
     studySessions,
@@ -389,6 +369,7 @@ export function StudyProvider({ children }: { children: ReactNode }) {
     getWeeklyStats,
     getSubjectProgress,
     getSubjects,
+    refreshStats,
   }
 
   return <StudyContext.Provider value={value}>{children}</StudyContext.Provider>

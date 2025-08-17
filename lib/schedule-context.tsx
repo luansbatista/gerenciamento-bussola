@@ -116,7 +116,6 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
           setCurrentWeekSchedule(null)
         }
       } catch (error) {
-        console.error("Error loading schedule:", error)
         // Não gerar cronograma automaticamente - deixar em branco
         setCurrentWeekSchedule(null)
       }
@@ -162,7 +161,6 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
   const generateSchedule = async () => {
     try {
       if (!studyContext || !coachContext || !reviewContext) {
-        console.warn("Contexts not ready for schedule generation")
         return
       }
 
@@ -181,7 +179,6 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
           dueReviews = Array.isArray(reviews) ? reviews : []
         }
       } catch (error) {
-        console.error("Error getting due reviews:", error)
         dueReviews = []
       }
 
@@ -197,7 +194,6 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
             review.subject.trim().length > 0
           )
         } catch (error) {
-          console.error("Error filtering review:", error)
           return false
         }
       }) : []

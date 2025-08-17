@@ -9,8 +9,16 @@ interface QuestionStatsProps {
 }
 
 export function QuestionStats({ totalQuestions, answeredCount, correctCount, isLoading = false }: QuestionStatsProps) {
+  // Log para debug
+  console.log('📊 QuestionStats recebeu:', { totalQuestions, answeredCount, correctCount, isLoading })
+  
   const accuracyPercentage = answeredCount > 0 ? (correctCount / answeredCount) * 100 : 0
   const progressPercentage = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0
+
+  // Garantir que os valores sejam números válidos
+  const safeAnsweredCount = typeof answeredCount === 'number' ? answeredCount : 0
+  const safeCorrectCount = typeof correctCount === 'number' ? correctCount : 0
+  const safeAccuracyPercentage = safeAnsweredCount > 0 ? (safeCorrectCount / safeAnsweredCount) * 100 : 0
 
   const stats = [
     {
@@ -22,21 +30,21 @@ export function QuestionStats({ totalQuestions, answeredCount, correctCount, isL
     },
     {
       title: "Respondidas",
-      value: answeredCount,
+      value: safeAnsweredCount,
       icon: CheckCircle,
       color: "text-green-600",
       bgColor: "bg-green-50",
     },
     {
       title: "Acertos",
-      value: correctCount,
+      value: safeCorrectCount,
       icon: Target,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
     },
     {
       title: "Taxa de Acerto",
-      value: `${Math.round(accuracyPercentage)}%`,
+      value: `${Math.round(safeAccuracyPercentage)}%`,
       icon: TrendingUp,
       color: "text-orange-600",
       bgColor: "bg-orange-50",
@@ -58,9 +66,11 @@ export function QuestionStats({ totalQuestions, answeredCount, correctCount, isL
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-medium">{stat.title}</p>
-                <p className="text-lg font-bold text-gray-900">
-                  {isLoading ? "..." : stat.value}
-                </p>
+                {isLoading ? (
+                  <div className="animate-pulse bg-gray-200 h-6 w-8 rounded"></div>
+                ) : (
+                  <p className="text-lg font-bold text-gray-900">{stat.value}</p>
+                )}
               </div>
             </div>
           </CardContent>
