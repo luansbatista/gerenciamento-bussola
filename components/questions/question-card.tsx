@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { CheckCircle, XCircle, Clock, Building, MessageCircle, BarChart3, Send, User } from "lucide-react"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 
 
 interface Question {
@@ -21,13 +21,15 @@ interface Question {
   opcao_c?: string
   opcao_d?: string
   opcao_e?: string
-  correct_answer: number
+  correct_answer: string | number
   alternativa_correta?: string
   difficulty: 'easy' | 'medium' | 'hard'
   nivel?: string
   created_at: string
   times_answered: number
   accuracy_rate: number
+  comentario?: string // Comentário explicativo da questão
+  explanation?: string // Explicação detalhada da resposta correta
 }
 
 interface QuestionCardProps {
@@ -42,6 +44,41 @@ export function QuestionCard({ question, selectedAnswer, showExplanation, onAnsw
   const [showStats, setShowStats] = useState(false)
   const [newComment, setNewComment] = useState("")
   const [comments, setComments] = useState<any[]>([]) // Removido mockComments, iniciando com array vazio
+
+  // Memoizar a lógica de cálculo da resposta correta
+  const correctAnswerData = useMemo(() => {
+    let correctAnswerIndex = -1
+    
+    // Usar o correct_answer que vem do contexto (já é número)
+    if (question.correct_answer !== null && question.correct_answer !== undefined) {
+      correctAnswerIndex = Number(question.correct_answer)
+    }
+    
+    // Garantir que correctAnswerIndex seja um número válido
+    if (isNaN(correctAnswerIndex) || correctAnswerIndex < 0 || correctAnswerIndex > 4) {
+      correctAnswerIndex = 0 // Fallback para A
+    }
+    
+    const result = {
+      correctAnswerIndex,
+      correctLetter: String.fromCharCode(97 + correctAnswerIndex).toUpperCase()
+    }
+    
+    return result
+  }, [question.correct_answer])
+
+  // Memoizar as opções
+  const options = useMemo(() => {
+    const opts = []
+    if (question.opcao_a && question.opcao_a.trim()) opts.push(question.opcao_a)
+    if (question.opcao_b && question.opcao_b.trim()) opts.push(question.opcao_b)
+    if (question.opcao_c && question.opcao_c.trim()) opts.push(question.opcao_c)
+    if (question.opcao_d && question.opcao_d.trim()) opts.push(question.opcao_d)
+    if (question.opcao_e && question.opcao_e.trim()) opts.push(question.opcao_e)
+    
+    // Se não há opções individuais, usar o array options
+    return opts.length > 0 ? opts : (question.options || [])
+  }, [question.opcao_a, question.opcao_b, question.opcao_c, question.opcao_d, question.opcao_e, question.options])
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -100,22 +137,14 @@ export function QuestionCard({ question, selectedAnswer, showExplanation, onAnsw
         <div className="space-y-3">
           {(() => {
             // Criar array de opções a partir das colunas individuais
-            const options = []
-            if (question.opcao_a && question.opcao_a.trim()) options.push(question.opcao_a)
-            if (question.opcao_b && question.opcao_b.trim()) options.push(question.opcao_b)
-            if (question.opcao_c && question.opcao_c.trim()) options.push(question.opcao_c)
-            if (question.opcao_d && question.opcao_d.trim()) options.push(question.opcao_d)
-            if (question.opcao_e && question.opcao_e.trim()) options.push(question.opcao_e)
-            
-            // Se não há opções individuais, usar o array options
             const finalOptions = options.length > 0 ? options : (question.options || [])
             
             if (finalOptions.length > 0) {
               return finalOptions.map((option, index) => {
                 const isSelected = selectedAnswer === index
-                // Verificar se a resposta está correta usando ambas as colunas possíveis
-                const correctAnswer = question.correct_answer || question.alternativa_correta
-                const isCorrect = String.fromCharCode(97 + index) === String(correctAnswer || '').toLowerCase()
+                
+                // Usar os dados memoizados
+                const isCorrect = index === correctAnswerData.correctAnswerIndex
                 const isWrong = isSelected && !isCorrect && showExplanation
 
                 let buttonVariant: "default" | "outline" | "destructive" = "outline"
@@ -175,13 +204,32 @@ export function QuestionCard({ question, selectedAnswer, showExplanation, onAnsw
             <h4 className="font-medium text-blue-900 mb-2">Explicação:</h4>
             <p className="text-blue-800 leading-relaxed">
               {(() => {
-                const correctAnswer = question.correct_answer || question.alternativa_correta
-                if (correctAnswer) {
-                  return `Alternativa correta: ${String(correctAnswer).toUpperCase()}`
+                if (correctAnswerData.correctAnswerIndex >= 0) {
+                  return `Alternativa correta: ${correctAnswerData.correctLetter}`
                 }
                 return 'Explicação não disponível'
               })()}
             </p>
+            
+            {/* Comentário da questão */}
+            {question.comentario && (
+              <div className="mt-4 pt-4 border-t border-blue-200">
+                <h5 className="font-medium text-blue-900 mb-2">Comentário da Questão:</h5>
+                <p className="text-blue-800 leading-relaxed text-sm">
+                  {question.comentario}
+                </p>
+              </div>
+            )}
+            
+            {/* Explicação detalhada */}
+            {question.explanation && (
+              <div className="mt-4 pt-4 border-t border-blue-200">
+                <h5 className="font-medium text-blue-900 mb-2">Explicação Detalhada:</h5>
+                <p className="text-blue-800 leading-relaxed text-sm">
+                  {question.explanation}
+                </p>
+              </div>
+            )}
           </div>
         )}
 

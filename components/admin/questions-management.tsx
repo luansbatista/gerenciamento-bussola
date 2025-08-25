@@ -108,7 +108,22 @@ export function QuestionsManagement() {
 
   const handleDeleteQuestion = async (id: string) => {
     if (confirm("Tem certeza que deseja deletar esta questão? Esta ação não pode ser desfeita.")) {
-      await deleteQuestion(id)
+      console.log('🗑️ Iniciando exclusão da questão:', id)
+      
+      try {
+        const result = await deleteQuestion(id)
+        
+        if (result.success) {
+          console.log('✅ Questão excluída com sucesso')
+          // Feedback visual pode ser adicionado aqui (toast, notificação, etc.)
+        } else {
+          console.error('❌ Erro ao excluir questão:', result.error)
+          alert(`Erro ao excluir questão: ${result.error}`)
+        }
+      } catch (error) {
+        console.error('💥 Exceção ao excluir questão:', error)
+        alert(`Erro inesperado ao excluir questão: ${error}`)
+      }
     }
   }
 

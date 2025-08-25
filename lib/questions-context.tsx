@@ -17,7 +17,7 @@ interface Question {
   opcao_c?: string
   opcao_d?: string
   opcao_e?: string
-  correct_answer: number
+  correct_answer: string | number
   alternativa_correta?: string
   difficulty: 'easy' | 'medium' | 'hard'
   nivel?: string
@@ -50,6 +50,8 @@ export function QuestionsProvider({ children }: { children: React.ReactNode }) {
 
   const supabase = createClient()
 
+  console.log('🔍 QuestionsProvider inicializado')
+
   // Função para gerar cores aleatórias
   const getRandomColor = () => {
     const colors = [
@@ -80,7 +82,7 @@ export function QuestionsProvider({ children }: { children: React.ReactNode }) {
       if (!subjectsError && subjectsData && subjectsData.length > 0) {
         // Se subjects tem dados, usar subjects
         const subjectsList = subjectsData.map((subject: any) => ({
-          id: subject.id || subject.name, // Usar ID se existir, senão usar nome
+          id: subject.id || subject.name,
           name: subject.name,
           color: subject.color || '#3B82F6',
           totalQuestions: subject.total_questions || 0
@@ -93,11 +95,17 @@ export function QuestionsProvider({ children }: { children: React.ReactNode }) {
       // Se subjects não tem dados, buscar da tabela questions
       const { data: questionsData, error: questionsError } = await supabase
         .from('questions')
-        .select('disciplina, subject, assunto')
+        .select('disciplina, subject')
         .or('disciplina.not.is.null,subject.not.is.null')
-        .limit(1000) // Limitar para evitar problemas de performance
+        .limit(1000)
       
       if (questionsError) {
+        console.error('Erro ao buscar disciplinas:', {
+          message: questionsError.message,
+          code: questionsError.code,
+          details: questionsError.details,
+          hint: questionsError.hint
+        })
         setSubjects([])
         return
       }
@@ -119,35 +127,20 @@ export function QuestionsProvider({ children }: { children: React.ReactNode }) {
         }
       })
       
-      const subjectsList = Array.from(uniqueSubjects).map((subjectName: string) => ({
-        id: subjectName, // Usar o nome como ID temporário
+      const colors = [
+        "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
+        "#06B6D4", "#84CC16", "#F97316", "#EC4899", "#6366F1"
+      ]
+      
+      const subjectsList = Array.from(uniqueSubjects).map((subjectName: string, index: number) => ({
+        id: subjectName,
         name: subjectName,
-        color: '#3B82F6',
+        color: colors[index % colors.length],
         totalQuestions: 0
       }))
       
-      // Adicionar cores diferentes para cada disciplina
-      const colors = [
-        "#3B82F6", // blue
-        "#10B981", // green
-        "#F59E0B", // yellow
-        "#EF4444", // red
-        "#8B5CF6", // purple
-        "#06B6D4", // cyan
-        "#84CC16", // lime
-        "#F97316", // orange
-        "#EC4899", // pink
-        "#6366F1"  // indigo
-      ]
-      
-      const subjectsWithColors = subjectsList.map((subject, index) => ({
-        ...subject,
-        color: colors[index % colors.length]
-      }))
-      
       // Garantir que há pelo menos um subject
-      if (subjectsWithColors.length === 0) {
-        // Se não há subjects, criar um padrão
+      if (subjectsList.length === 0) {
         setSubjects([{
           id: 'geral',
           name: 'Geral',
@@ -155,10 +148,10 @@ export function QuestionsProvider({ children }: { children: React.ReactNode }) {
           totalQuestions: 0
         }])
       } else {
-        setSubjects(subjectsWithColors)
+        setSubjects(subjectsList)
       }
     } catch (error) {
-      // Em caso de erro, criar um subject padrão
+      console.error('Erro ao buscar disciplinas:', error)
       setSubjects([{
         id: 'geral',
         name: 'Geral',
@@ -169,35 +162,48 @@ export function QuestionsProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const fetchQuestions = useCallback(async () => {
+    console.log('🔍 fetchQuestions iniciado')
     try {
       const supabase = createClient()
       
+      console.log('📊 Buscando questões no banco...')
       const { data: questionsData, error: questionsError } = await supabase
         .from('questions')
         .select('*')
         .order('created_at', { ascending: false })
       
       if (questionsError) {
+        console.error('❌ Erro ao buscar questões:', questionsError)
         setQuestions([])
         return
       }
       
+      console.log(`📊 Questões encontradas: ${questionsData?.length || 0}`)
+      
       if (!questionsData || !Array.isArray(questionsData) || questionsData.length === 0) {
+        console.log('❌ Nenhuma questão encontrada')
         setQuestions([])
         return
       }
       
       const mappedQuestions: Question[] = questionsData.map((q: any) => {
-        // Usar ambas as colunas de resposta correta
-        const correctAnswer = q.correct_answer || q.alternativa_correta
-        const correctAnswerStr = String(correctAnswer || 'A').toUpperCase()
+        // O banco já armazena números (0, 1, 2, 3, 4), não letras
+        let correctAnswerNumber = 0
         
-        // Mapear alternativa correta para número (A=0, B=1, C=2, D=3, E=4)
-        const correctAnswerNumber = correctAnswerStr === 'A' ? 0 : 
-                                   correctAnswerStr === 'B' ? 1 : 
-                                   correctAnswerStr === 'C' ? 2 : 
-                                   correctAnswerStr === 'D' ? 3 : 
-                                   correctAnswerStr === 'E' ? 4 : 0
+        if (q.correct_answer !== null && q.correct_answer !== undefined) {
+          if (typeof q.correct_answer === 'string') {
+            // Se for string, tentar converter para número
+            const parsed = parseInt(q.correct_answer, 10)
+            if (!isNaN(parsed) && parsed >= 0 && parsed <= 4) {
+              correctAnswerNumber = parsed
+            }
+          } else if (typeof q.correct_answer === 'number') {
+            // Se já for número, usar diretamente
+            if (q.correct_answer >= 0 && q.correct_answer <= 4) {
+              correctAnswerNumber = q.correct_answer
+            }
+          }
+        }
 
         // Verificar se a questão tem opções válidas
         const options = [
@@ -229,7 +235,7 @@ export function QuestionsProvider({ children }: { children: React.ReactNode }) {
           created_at: q.created_at,
           // Campos para compatibilidade - usar opções filtradas
           options: options,
-          correctAnswer: correctAnswerStr
+          correctAnswer: String.fromCharCode(97 + correctAnswerNumber).toUpperCase() // Mapear número para letra (A, B, C, D, E)
         }
       })
       
@@ -241,6 +247,7 @@ export function QuestionsProvider({ children }: { children: React.ReactNode }) {
 
   // Carregar dados iniciais
   useEffect(() => {
+    console.log('🔄 useEffect QuestionsProvider - carregando dados iniciais')
     fetchQuestions()
     fetchSubjects()
   }, [fetchQuestions, fetchSubjects])

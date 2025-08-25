@@ -12,13 +12,13 @@ export function QuickActions() {
       href: "/questions",
       gradient: "from-blue-500 to-blue-600",
     },
-    {
-      title: "Fazer Simulado",
-      description: "Teste seus conhecimentos",
-      icon: PlayCircle,
-      href: "/exams",
-      gradient: "from-green-500 to-green-600",
-    },
+    // {
+    //   title: "Fazer Simulado",
+    //   description: "Teste seus conhecimentos",
+    //   icon: PlayCircle,
+    //   href: "/exams",
+    //   gradient: "from-green-500 to-green-600",
+    // }, // Temporariamente oculto
     {
       title: "Flashcards",
       description: "Revisão rápida",

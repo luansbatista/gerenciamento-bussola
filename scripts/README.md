@@ -1,82 +1,92 @@
-# Scripts do Sistema Bússola da Aprovação
+# Configuração do Banco de Dados - Novo Projeto Supabase
 
-## 📋 Ordem de Execução dos Scripts
+## Passos para Configurar o Banco de Dados
 
-### 1. Configuração Inicial
-Execute apenas uma vez para configurar o banco de dados:
+1. **Acesse o painel do Supabase**
+   - Vá para https://supabase.com
+   - Faça login e acesse o projeto: `zghneimasvhimrzbwtrv`
 
-```sql
-01- configuração-banco-de-dados.sql
-```
+2. **Execute o Script SQL**
+   - No painel do Supabase, vá para "SQL Editor"
+   - Clique em "New Query"
+   - Copie todo o conteúdo do arquivo `00-estrutura-limpa-final.sql`
+   - Cole no editor SQL
+   - Clique em "Run" para executar
 
-### 2. Verificação do Sistema
-Execute para verificar se tudo está funcionando:
+3. **Verificar as Tabelas**
+   - Após executar o SQL, vá para "Table Editor"
+   - Verifique se as seguintes tabelas foram criadas:
+     - `profiles`
+     - `subjects`
+     - `questions`
+     - `question_attempts`
+     - `study_sessions`
+     - `flashcards`
+     - `flashcard_reviews`
+     - `pomodoro_sessions`
+     - `goals`
+     - `reviews`
+     - `schedule_events`
 
-```sql
-02- verificar-disciplinas.sql
-```
+4. **Configurar RLS (Row Level Security)**
+   - Vá para "Authentication" > "Policies"
+   - Verifique se as políticas de segurança estão ativas
 
-### 3. Correção Completa (Se houver problemas)
-Execute se encontrar problemas no sistema:
+5. **Testar a Aplicação**
+   - Após configurar o banco, reinicie o servidor de desenvolvimento
+   - Teste o login e as funcionalidades principais
 
-```sql
-14-correcao-completa-sistema.sql
-```
+## Credenciais Atualizadas
 
-### 4. Diagnóstico de Problemas (Se necessário)
-Execute para diagnosticar problemas específicos:
+As seguintes credenciais foram atualizadas em todos os arquivos:
 
-```sql
-15-diagnostico-completo-banco.sql
-16-teste-insercao-dados.sql
-```
+- **URL**: `https://zghneimasvhimrzbwtrv.supabase.co`
+- **Anon Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnaG5laW1hc3ZoaW1yemJ3dHJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0ODE4NzgsImV4cCI6MjA3MTA1Nzg3OH0.raFiD_cesWoed637PvSTo1cLgkNJSVz4AGlVzmjaD_0`
+- **Service Role Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnaG5laW1hc3ZoaW1yemJ3dHJ2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTQ4MTg3OCwiZXhwIjoyMDcxMDU3ODc4fQ.nct6kD-TJU2BZu3ycltJWpfBug83_AZg_4mB9TFbs2M`
 
-## 📁 Scripts Disponíveis
+## Arquivos Atualizados
 
-### Scripts Principais
-- `01- configuração-banco-de-dados.sql` - Configuração completa do banco
-- `02- verificar-disciplinas.sql` - Verificação do sistema
-- `14-correcao-completa-sistema.sql` - Correção completa
+Os seguintes arquivos foram atualizados com as novas credenciais:
 
-### Scripts de Diagnóstico
-- `15-diagnostico-completo-banco.sql` - Diagnóstico completo da estrutura do banco
-- `16-teste-insercao-dados.sql` - Teste específico de inserção de dados
-- `17-correcao-insercao-question-attempts.sql` - Correção específica para problemas de inserção
-- `18-teste-insercao-manual.sql` - Teste manual de inserção para debug
+- `lib/supabase.ts`
+- `utils/supabase/client.ts`
+- `utils/supabase/server.ts`
+- `utils/supabase/middleware.ts`
+- `.env.local` (criado)
 
-## ⚠️ Scripts Removidos
-Os seguintes scripts foram removidos por serem desnecessários ou duplicados:
-- `03-teste-consultas-aplicacao.sql`
-- `04-restaurar-perfis-usuarios.sql`
-- `05-inserir-dados-exemplo-usuario.sql`
-- `06-verificar-estrutura-profiles.sql`
-- `07-corrigir-estrutura-profiles.sql`
-- `08-adicionar-colunas-profiles.sql`
-- `09-configurar-admin.sql`
-- `10-testar-insercao-questions.sql`
-- `11-adicionar-opcao-e.sql`
-- `12-testar-importacao-csv.sql`
-- `13-diagnostico-insercao.sql`
-- `15-verificar-questoes-importadas.sql`
-- `16-verificar-questoes-simples.sql`
-- `17-debug-filtros-disciplinas.sql`
-- `18-corrigir-filtros-disciplinas.sql`
-- `19-corrigir-questoes-banco.sql`
-- `20-diagnostico-completo-questoes.sql`
-- `21-correcao-definitiva-questoes.sql`
-- `22-diagnostico-question-attempts.sql`
-- `23-testar-filtros-disciplinas.sql`
+## Próximos Passos
 
-## 🚀 Como Usar
+1. **Execute o script SQL no painel do Supabase**
+   - Vá para "SQL Editor" no painel do Supabase
+   - Execute o arquivo `00-estrutura-limpa-final.sql`
 
-1. **Primeira vez**: Execute apenas o script `01- configuração-banco-de-dados.sql`
-2. **Verificação**: Execute `02- verificar-disciplinas.sql` para verificar se tudo está OK
-3. **Problemas**: Se houver problemas, execute `14-correcao-completa-sistema.sql`
-4. **Diagnóstico**: Para problemas específicos, use `15-diagnostico-completo-banco.sql` e `16-teste-insercao-dados.sql`
+2. **Execute o script de correção RLS (SOLUÇÃO RÁPIDA)**
+   - Execute o arquivo `disable-rls-temp.sql` no SQL Editor
+   - Este script desabilita temporariamente o RLS para resolver o problema
+   - **Esta é a solução mais rápida** para fazer o sistema funcionar imediatamente
 
-## 📝 Notas Importantes
+3. **Verifique as tabelas**
+   - Execute o script `check-tables.js` para verificar se tudo está funcionando:
+   ```bash
+   node scripts/check-tables.js
+   ```
 
-- Execute os scripts na ordem correta
-- Não execute scripts de manutenção rotineiramente
-- Sempre verifique o resultado dos scripts
-- Em caso de dúvida, use o script de correção completa
+4. **Teste a aplicação**
+   - Acesse `http://localhost:3001/test-connection` para verificar a conectividade
+   - Teste o login e funcionalidades principais
+
+## Problemas Identificados e Soluções
+
+### ❌ Erro: "infinite recursion detected in policy"
+**Causa:** Políticas RLS mal configuradas na tabela `profiles`
+**Solução:** Execute o script `fix-rls-policies.sql`
+
+### ❌ Erro: "Could not find the table"
+**Causa:** Algumas tabelas não foram criadas
+**Solução:** O script `fix-rls-policies.sql` também cria as tabelas faltantes
+
+### ✅ Após executar os scripts:
+- Todas as tabelas estarão criadas
+- Políticas RLS funcionando corretamente
+- Dados iniciais de disciplinas inseridos
+- Sistema pronto para uso

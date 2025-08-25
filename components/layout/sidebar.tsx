@@ -31,15 +31,15 @@ import React from "react"
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
   { name: "Banco de Questões", href: "/questions", icon: FileText },
-  { name: "Simulados", href: "/exams", icon: BookOpen },
+  // { name: "Simulados", href: "/exams", icon: BookOpen }, // Temporariamente oculto
   { name: "Flashcards", href: "/flashcards", icon: Brain },
   { name: "Materiais", href: "/materials", icon: FolderOpen },
-  { name: "Revisões", href: "/reviews", icon: RotateCcw },
-  { name: "Cronograma", href: "/schedule", icon: Calendar },
+  // { name: "Revisões", href: "/reviews", icon: RotateCcw }, // Temporariamente oculto
+  // { name: "Cronograma", href: "/schedule", icon: Calendar }, // Temporariamente oculto
   { name: "Pomodoro", href: "/pomodoro", icon: Timer },
-  { name: "Coach de Estudo", href: "/coach", icon: Target },
+  // { name: "Coach de Estudo", href: "/coach", icon: Target }, // Temporariamente oculto
   { name: "Ranking", href: "/ranking", icon: Medal },
-  { name: "Estatísticas", href: "/stats", icon: BarChart3 },
+  // { name: "Estatísticas", href: "/stats", icon: BarChart3 }, // Temporariamente oculto
   { name: "Metas", href: "/goals", icon: Trophy },
 ]
 
@@ -69,15 +69,10 @@ export function Sidebar() {
     toggleSidebar()
   }
 
-  // Se for mobile, não renderizar o sidebar fixo
-  if (isMobile) {
-    return null
-  }
-
   return (
     <>
       {/* Desktop Menu Overlay */}
-      {!isCollapsed && (
+      {!isCollapsed && !isMobile && (
         <div className="fixed inset-0 z-50 hidden md:block">
           {/* Backdrop */}
           <div 
@@ -197,13 +192,13 @@ export function Sidebar() {
                 <div className="flex-shrink-0 p-4 border-t border-gray-200">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
-                        <span className="text-sm font-medium text-white">{user.name?.charAt(0).toUpperCase() || "U"}</span>
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                        {user.name?.charAt(0)?.toUpperCase() || 'U'}
                       </div>
                     </div>
-                    <div className="ml-3 min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">{user.name || "Usuário"}</p>
-                      <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                      <p className="text-xs text-gray-500">{user.email}</p>
                     </div>
                   </div>
                 </div>

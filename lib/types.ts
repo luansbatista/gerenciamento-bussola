@@ -39,6 +39,8 @@ export interface Question {
   times_answered?: number
   accuracy_rate?: number
   created_at?: string
+  comentario?: string // Comentário explicativo da questão
+  explanation?: string // Explicação detalhada da resposta correta
   // Campos para compatibilidade com componentes existentes
   options?: string[]
   correctAnswer?: string

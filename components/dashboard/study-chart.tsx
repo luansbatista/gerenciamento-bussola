@@ -1,15 +1,25 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import dynamic from 'next/dynamic'
+
+const BarChart = dynamic(() => import('recharts').then(mod => mod.BarChart), { ssr: false })
+const Bar = dynamic(() => import('recharts').then(mod => mod.Bar), { ssr: false })
+const XAxis = dynamic(() => import('recharts').then(mod => mod.XAxis), { ssr: false })
+const YAxis = dynamic(() => import('recharts').then(mod => mod.YAxis), { ssr: false })
+const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.CartesianGrid), { ssr: false })
+const Tooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false })
+const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false })
 import { TrendingUp } from "lucide-react"
 import { useStudy } from "@/lib/study-context"
 import { useAuth } from "@/lib/auth-context"
+import { usePomodoro } from "@/lib/pomodoro-context"
 import { useState, useEffect } from "react"
 
 export function StudyChart() {
   const { getWeeklyStats } = useStudy()
   const { user } = useAuth()
+  const { totalFocusTime } = usePomodoro()
   const [weeklyData, setWeeklyData] = useState([
     { day: "Seg", hours: 0 },
     { day: "Ter", hours: 0 },
@@ -32,8 +42,9 @@ export function StudyChart() {
         setIsLoading(true)
         const stats = await getWeeklyStats(user.id)
         
-        // Calcular distribuição das horas pelos dias da semana
-        const totalHours = stats.totalHours
+        // Adicionar o tempo do Pomodoro aos dados do banco
+        const pomodoroHours = totalFocusTime / 60
+        const totalHours = stats.totalHours + pomodoroHours
         const hoursPerDay = totalHours / 7
         
         const newData = [
@@ -55,7 +66,7 @@ export function StudyChart() {
     }
 
     loadWeeklyData()
-  }, [user?.id, getWeeklyStats])
+  }, [user?.id, totalFocusTime])
 
   const totalHours = weeklyData.reduce((sum, day) => sum + day.hours, 0)
 

@@ -380,60 +380,84 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
   // Adicionar questão
   const addQuestion = async (question: Omit<Question, 'id' | 'created_at' | 'times_answered' | 'accuracy_rate'>): Promise<{ success: boolean; data?: Question; error?: any }> => {
-    console.log('=== INÍCIO addQuestion ===')
-    console.log('addQuestion chamada com:', JSON.stringify(question, null, 2))
+    console.log('🚀 === INÍCIO addQuestion ===')
+    
+    // Função de retry
+    const retryOperation = async (operation: () => Promise<any>, maxRetries = 3, delay = 1000) => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`🔄 Tentativa ${attempt}/${maxRetries}`)
+          return await operation()
+        } catch (error) {
+          console.log(`❌ Tentativa ${attempt} falhou:`, error)
+          if (attempt === maxRetries) {
+            throw error
+          }
+          console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          delay *= 2 // Exponential backoff
+        }
+      }
+    }
+
     try {
-      console.log('Inserindo questão no Supabase...')
-      
-      // Preparar dados para inserção - mapeando colunas do CSV
-      const questionData = {
-        disciplina: question.disciplina || '',
-        subject: question.disciplina || question.subject || '', // Usar disciplina como subject também
-        assunto: question.assunto || '',
-        question: question.question || question.enunciado || '', // Usar enunciado se question não existir
-        enunciado: question.enunciado || question.question || '', // Usar question se enunciado não existir
-        opcao_a: question.opcao_a || '',
-        opcao_b: question.opcao_b || '',
-        opcao_c: question.opcao_c || '',
-        opcao_d: question.opcao_d || '',
-        opcao_e: question.opcao_e || '', // Coluna do CSV
-        alternativa_correta: question.alternativa_correta || question.correct_answer || '',
-        correct_answer: question.correct_answer || question.alternativa_correta || '',
-        difficulty: question.difficulty || question.nivel || 'médio', // Usar nivel como difficulty
-        nivel: question.nivel || question.difficulty || 'médio' // Usar difficulty como nivel
+      console.log('🔧 Preparando dados...')
+      // Calcular correct_answer de forma robusta (0 é válido)
+      let computedCorrectAnswer: number = 0
+      if (typeof (question as any).correct_answer === 'number') {
+        computedCorrectAnswer = (question as any).correct_answer as number
+        console.log('📊 Usando correct_answer numérico:', computedCorrectAnswer)
+      } else if (typeof (question as any).alternativa_correta === 'string') {
+        const alt = ((question as any).alternativa_correta as string).toUpperCase()
+        computedCorrectAnswer = alt === 'A' ? 0 : alt === 'B' ? 1 : alt === 'C' ? 2 : alt === 'D' ? 3 : alt === 'E' ? 4 : 0
+        console.log('📊 Convertendo alternativa_correta:', alt, 'para:', computedCorrectAnswer)
       }
 
-      console.log('Dados preparados para inserção:', JSON.stringify(questionData, null, 2))
-      console.log('Tentando inserir no Supabase...')
+      // Preparar dados para inserção - apenas colunas que existem na tabela
+      const questionData = {
+        disciplina: (question as any).disciplina || '',
+        subject: (question as any).disciplina || (question as any).subject || '',
+        assunto: (question as any).assunto || '',
+        question: (question as any).question || (question as any).enunciado || '',
+        enunciado: (question as any).enunciado || (question as any).question || '',
+        opcao_a: (question as any).opcao_a || '',
+        opcao_b: (question as any).opcao_b || '',
+        opcao_c: (question as any).opcao_c || '',
+        opcao_d: (question as any).opcao_d || '',
+        opcao_e: (question as any).opcao_e || '',
+        correct_answer: computedCorrectAnswer,
+        difficulty: (question as any).difficulty || 'medium',
+        nivel: (question as any).nivel || 'médio'
+      }
+
+      console.log('📝 Dados preparados')
 
       // Verificar se todos os campos obrigatórios estão presentes
       if (!questionData.disciplina || !questionData.question) {
+        console.log('❌ Campos obrigatórios faltando')
         throw new Error('Campos obrigatórios (disciplina e question) não podem estar vazios')
       }
 
-      const { data, error } = await supabase
-        .from('questions')
-        .insert([questionData])
-        .select()
-        .single()
+      console.log('🚀 Chamando Supabase com retry...')
+      
+      // Usar retry logic para a operação do Supabase
+      const { data, error } = await retryOperation(async () => {
+        return await supabase
+          .from('questions')
+          .insert([questionData])
+          .select()
+          .single()
+      })
 
-      console.log('Resposta do Supabase - data:', data)
-      console.log('Resposta do Supabase - error:', error)
+      console.log('📊 Resposta do Supabase recebida')
 
       if (error) {
-        console.error('=== ERRO DO SUPABASE ===')
+        console.error('❌ === ERRO DO SUPABASE ===')
         console.error('Erro do Supabase:', error)
-        console.error('Detalhes do erro:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        })
-        console.error('Dados que tentaram ser inseridos:', JSON.stringify(questionData, null, 2))
         throw error
       }
 
-      console.log('Questão inserida no Supabase:', data)
+      console.log('✅ Questão inserida no Supabase')
 
       const newQuestion: Question = {
         ...question,
@@ -444,21 +468,18 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Adicionar à lista local
+      console.log('🔄 Atualizando lista local...')
       setQuestions(prev => {
         const newList = [newQuestion, ...prev]
-        console.log(`Questão adicionada ao banco e memória. Total: ${newList.length}`)
+        console.log(`✅ Lista atualizada, total: ${newList.length}`)
         return newList
       })
 
-      console.log('=== FIM addQuestion - SUCESSO ===')
+      console.log('✅ === FIM addQuestion - SUCESSO ===')
       return { success: true, data: newQuestion }
     } catch (error) {
-      console.error('=== ERRO EM addQuestion ===')
+      console.error('💥 === ERRO EM addQuestion ===')
       console.error('Erro ao adicionar questão:', error)
-      console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
-      console.error('Tipo do erro:', typeof error)
-      console.error('Erro como string:', String(error))
-      console.error('=== FIM addQuestion - ERRO ===')
       return { success: false, error }
     }
   }
@@ -498,19 +519,64 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
   // Deletar questão
   const deleteQuestion = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('questions')
-        .delete()
-        .eq('id', id)
+    console.log('🗑️ === INÍCIO deleteQuestion ===')
+    console.log('ID da questão a ser excluída:', id)
+    
+    // Função de retry
+    const retryOperation = async (operation: () => Promise<any>, maxRetries = 3, delay = 1000) => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`🔄 Tentativa ${attempt}/${maxRetries} de exclusão`)
+          return await operation()
+        } catch (error) {
+          console.log(`❌ Tentativa ${attempt} falhou:`, error)
+          if (attempt === maxRetries) {
+            throw error
+          }
+          console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          delay *= 2 // Exponential backoff
+        }
+      }
+    }
 
-      if (error) throw error
+    try {
+      console.log('🚀 Chamando Supabase para exclusão...')
+      
+      // Usar retry logic para a operação de exclusão
+      const { error } = await retryOperation(async () => {
+        return await supabase
+          .from('questions')
+          .delete()
+          .eq('id', id)
+      })
+
+      if (error) {
+        console.error('❌ === ERRO DO SUPABASE NA EXCLUSÃO ===')
+        console.error('Erro do Supabase:', error)
+        console.error('Detalhes do erro:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        })
+        throw error
+      }
+
+      console.log('✅ Questão excluída do Supabase com sucesso')
 
       // Remover da lista local
-      setQuestions(prev => prev.filter(q => q.id !== id))
+      console.log('🔄 Atualizando lista local...')
+      setQuestions(prev => {
+        const newList = prev.filter(q => q.id !== id)
+        console.log(`✅ Lista atualizada, total: ${newList.length}`)
+        return newList
+      })
 
+      console.log('✅ === FIM deleteQuestion - SUCESSO ===')
       return { success: true }
     } catch (error) {
+      console.error('💥 === ERRO EM deleteQuestion ===')
       console.error('Erro ao deletar questão:', error)
       return { success: false, error }
     }

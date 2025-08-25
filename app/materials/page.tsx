@@ -56,6 +56,9 @@ export default function MaterialsPage() {
     file_type: ""
   })
 
+  // Verificar se o usuário é admin
+  const isAdmin = user?.isAdmin || user?.role === "admin"
+
   // Carregar materiais do banco
   useEffect(() => {
     const fetchMaterials = async () => {
@@ -90,6 +93,12 @@ export default function MaterialsPage() {
   }, [supabase])
 
   const handleUploadMaterial = async () => {
+    // Verificar se o usuário é admin
+    if (!isAdmin) {
+      alert('Apenas administradores podem adicionar materiais')
+      return
+    }
+
     if (!user?.id || !newMaterial.title || !newMaterial.subject) {
       alert('Preencha todos os campos obrigatórios')
       return
@@ -176,6 +185,16 @@ export default function MaterialsPage() {
               <p className="text-purple-100 text-lg mt-2">
                 Acesse e compartilhe materiais complementares para seus estudos
               </p>
+              {!isAdmin && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                    Modo Visualização
+                  </Badge>
+                  <span className="text-purple-200 text-sm">
+                    Apenas administradores podem adicionar materiais
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -210,13 +229,16 @@ export default function MaterialsPage() {
             </Select>
           </div>
 
-          <Button
-            onClick={() => setShowUploadForm(!showUploadForm)}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Enviar Material
-          </Button>
+          {/* Botão de upload só para administradores */}
+          {isAdmin && (
+            <Button
+              onClick={() => setShowUploadForm(!showUploadForm)}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Enviar Material
+            </Button>
+          )}
         </div>
 
         {/* Formulário de Upload */}
@@ -336,10 +358,10 @@ export default function MaterialsPage() {
               <p className="text-gray-600 mb-4">
                 {searchTerm || selectedSubject !== "all" 
                   ? "Tente ajustar os filtros de busca" 
-                  : "Seja o primeiro a compartilhar um material!"
+                  : "Aguardando materiais serem adicionados pelos administradores."
                 }
               </p>
-              {!searchTerm && selectedSubject === "all" && (
+              {!searchTerm && selectedSubject === "all" && isAdmin && (
                 <Button onClick={() => setShowUploadForm(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Enviar Primeiro Material
@@ -389,7 +411,7 @@ export default function MaterialsPage() {
                       variant="outline" 
                       size="sm" 
                       className="w-full"
-                      onClick={() => window.open(material.file_url, '_blank')}
+                      onClick={() => material.file_url && window.open(material.file_url, '_blank')}
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Acessar Material

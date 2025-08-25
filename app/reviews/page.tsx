@@ -147,19 +147,19 @@ export default function ReviewsPage() {
         </div>
 
         <Tabs defaultValue="review" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-white/80 backdrop-blur-sm shadow-lg">
+          <TabsList className="grid w-full grid-cols-2 bg-white/80 backdrop-blur-sm shadow-lg">
             <TabsTrigger
               value="review"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
             >
               Revisar Agora
             </TabsTrigger>
-            <TabsTrigger
+            {/* <TabsTrigger
               value="schedule"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
             >
               Cronograma
-            </TabsTrigger>
+            </TabsTrigger> */} {/* Temporariamente oculto */}
             <TabsTrigger
               value="history"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-purple-500 data-[state=active]:text-white"
@@ -335,7 +335,7 @@ export default function ReviewsPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="schedule" className="space-y-6">
+          {/* <TabsContent value="schedule" className="space-y-6">
             <Card className="shadow-soft border-0 animate-fade-in-up">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -411,7 +411,7 @@ export default function ReviewsPage() {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          </TabsContent> */} {/* Temporariamente oculto */}
 
           <TabsContent value="history" className="space-y-6">
             <Card className="shadow-soft border-0 animate-fade-in-up">

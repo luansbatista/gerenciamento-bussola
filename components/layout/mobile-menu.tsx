@@ -30,15 +30,15 @@ import { useState } from "react"
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
   { name: "Banco de Questões", href: "/questions", icon: FileText },
-  { name: "Simulados", href: "/exams", icon: BookOpen },
+  // { name: "Simulados", href: "/exams", icon: BookOpen }, // Temporariamente oculto
   { name: "Flashcards", href: "/flashcards", icon: Brain },
   { name: "Materiais", href: "/materials", icon: FolderOpen },
-  { name: "Revisões", href: "/reviews", icon: RotateCcw },
-  { name: "Cronograma", href: "/schedule", icon: Calendar },
+  // { name: "Revisões", href: "/reviews", icon: RotateCcw }, // Temporariamente oculto
+  // { name: "Cronograma", href: "/schedule", icon: Calendar }, // Temporariamente oculto
   { name: "Pomodoro", href: "/pomodoro", icon: Timer },
-  { name: "Coach de Estudo", href: "/coach", icon: Target },
+  // { name: "Coach de Estudo", href: "/coach", icon: Target }, // Temporariamente oculto
   { name: "Ranking", href: "/ranking", icon: Medal },
-  { name: "Estatísticas", href: "/stats", icon: BarChart3 },
+  // { name: "Estatísticas", href: "/stats", icon: BarChart3 }, // Temporariamente oculto
   { name: "Metas", href: "/goals", icon: Trophy },
 ]
 

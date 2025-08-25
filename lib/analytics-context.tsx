@@ -68,10 +68,11 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient()
     
     try {
-      // Buscar ranking real do banco de dados
+      // Buscar ranking real do banco de dados (apenas estudantes, não admins)
       const { data: rankings, error } = await supabase
         .from('profiles')
-        .select('id, name, email, total_questions_answered, accuracy_rate, total_study_hours, current_streak')
+        .select('id, full_name, email, total_questions_answered, accuracy_rate, total_study_hours, current_streak')
+        .eq('is_admin', false) // Excluir admins do ranking
         .order('total_questions_answered', { ascending: false })
         .limit(10)
 
@@ -82,7 +83,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
 
       const rankingsList: StudentRanking[] = rankings?.map((user, index) => ({
         id: user.id,
-        name: user.name || 'Usuário',
+        name: user.full_name || 'Usuário',
         email: user.email || '',
         score: Math.round((user.total_questions_answered || 0) * ((user.accuracy_rate || 0) / 100)),
         questionsAnswered: user.total_questions_answered || 0,
@@ -118,17 +119,17 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Buscar estatísticas reais por disciplina do usuário
+      // Buscar estatísticas reais por disciplina do usuário específico
       const { data: subjectStats, error } = await supabase
         .from('question_attempts')
         .select(`
           *,
           questions!inner(
-            subject_id,
-            subjects!inner(name)
+            disciplina,
+            subject
           )
         `)
-        .eq('user_id', currentUserId)
+        .eq('user_id', currentUserId) // Garantir que é apenas do usuário atual
         .gte('attempted_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
 
       if (error) {
@@ -148,7 +149,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       let totalCorrect = 0
       
       subjectStats?.forEach(attempt => {
-        const subjectName = attempt.questions?.subjects?.name || 'Geral'
+        const subjectName = attempt.questions?.disciplina || attempt.questions?.subject || 'Geral'
         if (!breakdown[subjectName]) {
           breakdown[subjectName] = { answered: 0, correct: 0, accuracy: 0 }
         }

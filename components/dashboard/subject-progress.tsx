@@ -6,6 +6,14 @@ import { BookOpen } from "lucide-react"
 import { useStudy } from "@/lib/study-context"
 import { useAuth } from "@/lib/auth-context"
 import { useState, useEffect } from "react"
+import dynamic from 'next/dynamic'
+
+const PieChart = dynamic(() => import('recharts').then(mod => mod.PieChart), { ssr: false })
+const Pie = dynamic(() => import('recharts').then(mod => mod.Pie), { ssr: false })
+const Cell = dynamic(() => import('recharts').then(mod => mod.Cell), { ssr: false })
+const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false })
+const Tooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false })
+const Legend = dynamic(() => import('recharts').then(mod => mod.Legend), { ssr: false })
 
 interface SubjectProgressData {
   id: string
@@ -16,7 +24,23 @@ interface SubjectProgressData {
   totalQuestions: number
 }
 
-// Cores padrão para disciplinas (fallback)
+// Cores específicas para cada disciplina
+const subjectColors: Record<string, string> = {
+  'Português': '#3B82F6', // Azul
+  'Matemática': '#10B981', // Verde
+  'Direito Constitucional': '#F59E0B', // Amarelo
+  'Direito Penal': '#EF4444', // Vermelho
+  'Direito Administrativo': '#8B5CF6', // Roxo
+  'Direito Penal Militar': '#06B6D4', // Ciano
+  'História do Brasil': '#84CC16', // Verde lima
+  'Geografia do Brasil': '#F97316', // Laranja
+  'Informática': '#EC4899', // Rosa
+  'Atualidades': '#6366F1', // Índigo
+  'Direitos Humanos': '#059669', // Verde escuro
+  'Constituição do estado da Bahia': '#DC2626', // Vermelho escuro
+}
+
+// Cores padrão para disciplinas não mapeadas (fallback)
 const defaultColors = [
   "#3B82F6", // Azul
   "#10B981", // Verde
@@ -63,10 +87,10 @@ export function SubjectProgress() {
           return
         }
 
-        // Adicionar cores para disciplinas que não têm cor definida
+        // Adicionar cores específicas para cada disciplina
         const subjectsWithColors = subjectsData.map((subject, index) => ({
           ...subject,
-          color: subject.color || defaultColors[index % defaultColors.length]
+          color: subjectColors[subject.name] || defaultColors[index % defaultColors.length]
         }))
 
         setSubjects(subjectsWithColors)
@@ -143,32 +167,50 @@ export function SubjectProgress() {
           Progresso por Matéria
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {subjectProgress.map((subject) => {
-          const progressPercentage = subject.totalQuestions > 0 
-            ? (subject.completed / subject.totalQuestions) * 100 
-            : 0
-          
-          return (
-            <div key={subject.id} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full" style={{ backgroundColor: subject.color }} />
-                  <span className="text-sm font-medium">{subject.name}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-sm font-medium">
-                    {subject.completed}/{subject.totalQuestions}
-                  </span>
-                  <span className="text-xs text-gray-500 ml-2">
-                    {subject.accuracy.toFixed(1)}% acerto
-                  </span>
-                </div>
+      <CardContent>
+        <div className="h-[400px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={subjectProgress}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                outerRadius={120}
+                dataKey="completed"
+              >
+                {subjectProgress.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip 
+                formatter={(value, name, props) => [
+                  `${value} questões`, 
+                  props.payload.name
+                ]}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        
+        <div className="mt-6 space-y-3">
+          {subjectProgress.map((subject) => (
+            <div key={subject.id} className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-3">
+                <div className="h-4 w-4 rounded-full" style={{ backgroundColor: subject.color }} />
+                <span className="font-medium">{subject.name}</span>
               </div>
-              <Progress value={progressPercentage} className="h-2" />
+              <div className="text-right">
+                <span className="font-bold text-lg">
+                  {subject.accuracy.toFixed(1)}%
+                </span>
+                <span className="text-xs text-gray-500 ml-1">
+                  acerto
+                </span>
+              </div>
             </div>
-          )
-        })}
+          ))}
+        </div>
       </CardContent>
     </Card>
   )

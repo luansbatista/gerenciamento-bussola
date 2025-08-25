@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,10 +13,11 @@ import { useStudy } from "@/lib/study-context"
 import { usePomodoro } from "@/lib/pomodoro-context"
 
 export default function GoalsPage() {
-  const { dailyGoals, createGoal, deleteGoal, getTodayStudyTime, getTodayQuestionsCount } = useStudy()
+  const { dailyGoals, setDailyGoals, createGoal, deleteGoal, getTodayStudyTime, getTodayQuestionsCount } = useStudy()
   const { totalFocusTime, formatTime } = usePomodoro()
 
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [todayQuestionsCount, setTodayQuestionsCount] = useState(0)
   const [newGoal, setNewGoal] = useState({
     title: "",
     type: "daily" as "daily" | "weekly" | "monthly",
@@ -62,8 +63,8 @@ export default function GoalsPage() {
         return "Questões"
       case "hours":
         return "Horas"
-      case "exams":
-        return "Simulados"
+      // case "exams":
+      //   return "Simulados" // Temporariamente oculto
       default:
         return "Meta"
     }
@@ -87,10 +88,47 @@ export default function GoalsPage() {
       return Math.floor((totalFocusTime / 60) * 100) / 100 // Convert minutes to hours
     }
     if (goal.category === "questions") {
-      return getTodayQuestionsCount()
+      return todayQuestionsCount
     }
     return goal.current
   }
+
+  // Carregar número de questões de hoje
+  useEffect(() => {
+    const loadQuestionsCount = async () => {
+      try {
+        const count = await getTodayQuestionsCount()
+        setTodayQuestionsCount(count)
+      } catch (error) {
+        console.error('Erro ao carregar questões de hoje:', error)
+        setTodayQuestionsCount(0)
+      }
+    }
+
+    loadQuestionsCount()
+  }, [])
+
+  // Atualizar metas em tempo real
+  useEffect(() => {
+    const updateGoals = () => {
+      const updatedGoals = dailyGoals.map((goal) => {
+        const currentProgress = getRealTimeProgress(goal)
+        return {
+          ...goal,
+          current: currentProgress,
+          completed: currentProgress >= goal.target
+        }
+      })
+      setDailyGoals(updatedGoals)
+    }
+
+    updateGoals()
+    
+    // Atualizar a cada minuto
+    const interval = setInterval(updateGoals, 60000)
+    
+    return () => clearInterval(interval)
+  }, [totalFocusTime, todayQuestionsCount])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-100">
@@ -150,7 +188,7 @@ export default function GoalsPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Questões Hoje</p>
-                  <p className="text-2xl font-bold">{getTodayQuestionsCount()}</p>
+                  <p className="text-2xl font-bold">-</p>
                 </div>
               </div>
             </CardContent>
@@ -217,7 +255,7 @@ export default function GoalsPage() {
                     <SelectContent>
                       <SelectItem value="questions">Questões</SelectItem>
                       <SelectItem value="hours">Horas de Estudo</SelectItem>
-                      <SelectItem value="exams">Simulados</SelectItem>
+                      {/* <SelectItem value="exams">Simulados</SelectItem> */} {/* Temporariamente oculto */}
                     </SelectContent>
                   </Select>
                 </div>

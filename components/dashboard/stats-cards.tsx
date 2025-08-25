@@ -2,11 +2,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { BookOpen, Clock, Target, TrendingUp } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useStudy } from "@/lib/study-context"
+import { usePomodoro } from "@/lib/pomodoro-context"
 import { useState, useEffect } from "react"
 
 export function StatsCards() {
   const { user } = useAuth()
   const { getWeeklyStats } = useStudy()
+  const { totalFocusTime } = usePomodoro()
   const [stats, setStats] = useState({
     totalStudyHours: 0,
     currentStreak: 0,
@@ -21,29 +23,24 @@ export function StatsCards() {
       return
     }
 
-    // Timeout de segurança para evitar loading infinito
-    const timeoutId = setTimeout(() => {
-      setIsLoading(false)
-      setStats({
-        totalStudyHours: 0,
-        currentStreak: user.currentStreak || 0,
-        totalQuestionsAnswered: 0,
-        accuracyRate: 0
-      })
-    }, 5000) // 5 segundos
-
     try {
       setIsLoading(true)
       const weeklyStats = await getWeeklyStats(user.id)
       
-      setStats({
-        totalStudyHours: weeklyStats.totalHours,
+      // Adicionar o tempo do Pomodoro aos dados do banco
+      const pomodoroHours = totalFocusTime / 60
+      const totalHours = weeklyStats.totalHours + pomodoroHours
+      
+      const finalStats = {
+        totalStudyHours: totalHours,
         currentStreak: user.currentStreak || 0,
         totalQuestionsAnswered: weeklyStats.totalQuestions,
         accuracyRate: weeklyStats.accuracy
-      })
-      clearTimeout(timeoutId)
+      }
+      
+      setStats(finalStats)
     } catch (error) {
+      console.error('❌ Erro ao carregar estatísticas:', error)
       // Manter dados padrão em caso de erro
       setStats({
         totalStudyHours: 0,
@@ -51,15 +48,16 @@ export function StatsCards() {
         totalQuestionsAnswered: 0,
         accuracyRate: 0
       })
-      clearTimeout(timeoutId)
     } finally {
       setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    loadStats()
-  }, [user?.id]) // Usar apenas user.id para evitar loops
+    if (user?.id) {
+      loadStats()
+    }
+  }, [user?.id, totalFocusTime])
 
   // Escutar evento de atualização de estatísticas
   useEffect(() => {
@@ -72,7 +70,7 @@ export function StatsCards() {
     return () => {
       window.removeEventListener('statsUpdated', handleStatsUpdate)
     }
-  }, [user?.id])
+  }, [user?.id, totalFocusTime])
 
   const statsData = [
     {

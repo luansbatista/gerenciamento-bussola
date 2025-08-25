@@ -1,108 +1,212 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+"use client"
 
-export default async function TestConnectionPage() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+import { useState, useEffect } from 'react'
+import { createClient } from '@/utils/supabase/client'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
-  // Teste 1: Buscar matérias
-  const { data: subjects, error: subjectsError } = await supabase
-    .from('subjects')
+export default function TestConnectionPage() {
+  const [connectionStatus, setConnectionStatus] = useState<'loading' | 'success' | 'error'>('loading')
+  const [errorMessage, setErrorMessage] = useState('')
+  const [testResults, setTestResults] = useState<any>({})
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    testConnection()
+  }, [])
+
+  const testConnection = async () => {
+    try {
+      setConnectionStatus('loading')
+      setErrorMessage('')
+
+      // Teste 1: Verificar se consegue acessar a API
+      const { data: apiTest, error: apiError } = await supabase
+        .from('profiles')
+        .select('count')
+        .limit(1)
+
+      if (apiError) {
+        throw new Error(`Erro na API: ${apiError.message}`)
+      }
+
+      // Teste 2: Verificar autenticação
+      const { data: { session }, error: authError } = await supabase.auth.getSession()
+      
+      if (authError) {
+        throw new Error(`Erro na autenticação: ${authError.message}`)
+      }
+
+      // Teste 3: Verificar se as tabelas existem
+      const tables = ['profiles', 'subjects', 'questions', 'study_sessions']
+      const tableResults: any = {}
+
+      for (const table of tables) {
+        try {
+          const { data, error } = await supabase
+            .from(table)
     .select('*')
-    .limit(5)
+            .limit(1)
+          
+          tableResults[table] = {
+            exists: !error,
+            error: error?.message || null
+          }
+        } catch (err) {
+          tableResults[table] = {
+            exists: false,
+            error: err instanceof Error ? err.message : 'Erro desconhecido'
+          }
+        }
+      }
 
-  // Teste 2: Buscar questões
-  const { data: questions, error: questionsError } = await supabase
-    .from('questions')
-    .select('*')
-    .limit(3)
+      setTestResults({
+        api: { success: true },
+        auth: { success: true, session: !!session },
+        tables: tableResults
+      })
+
+      setConnectionStatus('success')
+
+    } catch (error) {
+      setConnectionStatus('error')
+      setErrorMessage(error instanceof Error ? error.message : 'Erro desconhecido')
+    }
+  }
+
+  const getStatusColor = (status: 'loading' | 'success' | 'error') => {
+    switch (status) {
+      case 'loading': return 'bg-yellow-500'
+      case 'success': return 'bg-green-500'
+      case 'error': return 'bg-red-500'
+    }
+  }
+
+  const getStatusText = (status: 'loading' | 'success' | 'error') => {
+    switch (status) {
+      case 'loading': return 'Testando...'
+      case 'success': return 'Conectado'
+      case 'error': return 'Erro'
+    }
+  }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8 text-center">Teste de Conexão Supabase</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Teste de Matérias */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-blue-600">Matérias</h2>
-          {subjectsError ? (
-            <div className="text-red-500">
-              <p>Erro ao buscar matérias:</p>
-              <pre className="text-sm">{JSON.stringify(subjectsError, null, 2)}</pre>
-            </div>
-          ) : (
-            <div>
-              <p className="text-green-600 mb-3">✅ Conexão bem-sucedida!</p>
-              <p className="text-gray-600 mb-3">Encontradas {subjects?.length || 0} matérias:</p>
-              <ul className="space-y-2">
-                {subjects?.map((subject) => (
-                  <li key={subject.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: subject.color }}
-                    ></div>
-                    <span className="font-medium">{subject.name}</span>
-                    <span className="text-sm text-gray-500">({subject.total_questions} questões)</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        {/* Teste de Questões */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-green-600">Questões</h2>
-          {questionsError ? (
-            <div className="text-red-500">
-              <p>Erro ao buscar questões:</p>
-              <pre className="text-sm">{JSON.stringify(questionsError, null, 2)}</pre>
-            </div>
-          ) : (
-            <div>
-              <p className="text-green-600 mb-3">✅ Conexão bem-sucedida!</p>
-              <p className="text-gray-600 mb-3">Encontradas {questions?.length || 0} questões:</p>
-              <ul className="space-y-3">
-                {questions?.map((question) => (
-                  <li key={question.id} className="p-3 bg-gray-50 rounded">
-                    <p className="font-medium text-sm mb-2">{question.question.substring(0, 100)}...</p>
-                    <div className="flex gap-2 text-xs">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                        {question.difficulty}
-                      </span>
-                      <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded">
-                        {question.year}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Teste de Conexão - Supabase</h1>
+        <Button onClick={testConnection} disabled={connectionStatus === 'loading'}>
+          Testar Novamente
+        </Button>
       </div>
 
       {/* Status Geral */}
-      <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-semibold mb-4">Status da Conexão</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${subjectsError ? 'bg-red-500' : 'bg-green-500'}`}></div>
-            <span>Matérias: {subjectsError ? 'Erro' : 'OK'}</span>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Status da Conexão
+            <div className={`w-3 h-3 rounded-full ${getStatusColor(connectionStatus)}`} />
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2">
+            <Badge variant={connectionStatus === 'success' ? 'default' : connectionStatus === 'error' ? 'destructive' : 'secondary'}>
+              {getStatusText(connectionStatus)}
+            </Badge>
+            {connectionStatus === 'error' && (
+              <span className="text-red-600 font-medium">{errorMessage}</span>
+            )}
           </div>
-          <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${questionsError ? 'bg-red-500' : 'bg-green-500'}`}></div>
-            <span>Questões: {questionsError ? 'Erro' : 'OK'}</span>
+        </CardContent>
+      </Card>
+
+      {/* Configurações */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Configurações do Supabase</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">URL:</label>
+            <p className="text-sm text-gray-600 break-all">
+              {process.env.NEXT_PUBLIC_SUPABASE_URL || 'Não definida'}
+            </p>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Chave Anônima:</label>
+            <p className="text-sm text-gray-600 break-all">
+              {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 50) + '...' : 
+                'Não definida'
+              }
+            </p>
+            </div>
+        </CardContent>
+      </Card>
+
+      {/* Resultados dos Testes */}
+      {connectionStatus !== 'loading' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Resultados dos Testes</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Teste da API */}
+            <div>
+              <h4 className="font-medium mb-2">API REST</h4>
+              <Badge variant={testResults.api?.success ? 'default' : 'destructive'}>
+                {testResults.api?.success ? '✅ Funcionando' : '❌ Erro'}
+              </Badge>
+            </div>
+
+            {/* Teste de Autenticação */}
+            <div>
+              <h4 className="font-medium mb-2">Autenticação</h4>
+              <Badge variant={testResults.auth?.success ? 'default' : 'destructive'}>
+                {testResults.auth?.success ? '✅ Funcionando' : '❌ Erro'}
+              </Badge>
+              {testResults.auth?.session && (
+                <p className="text-sm text-gray-600 mt-1">Sessão ativa: {testResults.auth.session ? 'Sim' : 'Não'}</p>
+          )}
+        </div>
+
+            {/* Teste das Tabelas */}
+            <div>
+              <h4 className="font-medium mb-2">Tabelas do Banco</h4>
+              <div className="space-y-2">
+                {testResults.tables && Object.entries(testResults.tables).map(([table, result]: [string, any]) => (
+                  <div key={table} className="flex items-center gap-2">
+                    <Badge variant={result.exists ? 'default' : 'destructive'}>
+                      {result.exists ? '✅' : '❌'} {table}
+                    </Badge>
+                    {result.error && (
+                      <span className="text-sm text-red-600">({result.error})</span>
+          )}
+        </div>
+                ))}
           </div>
         </div>
-        
-        {!subjectsError && !questionsError && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
-            <p className="text-green-800 font-medium">🎉 Tudo funcionando perfeitamente!</p>
-            <p className="text-green-600 text-sm">O Supabase está configurado e conectado com sucesso.</p>
-          </div>
-        )}
-      </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Instruções */}
+      {connectionStatus === 'error' && (
+        <Alert>
+          <AlertDescription>
+            <strong>Para resolver o problema:</strong>
+            <ol className="list-decimal list-inside mt-2 space-y-1">
+              <li>Verifique se o projeto Supabase está ativo</li>
+              <li>Confirme se as credenciais estão corretas</li>
+              <li>Execute o script SQL no painel do Supabase</li>
+              <li>Verifique se as tabelas foram criadas</li>
+              <li>Teste novamente a conexão</li>
+            </ol>
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   )
 }

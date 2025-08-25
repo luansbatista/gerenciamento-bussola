@@ -21,6 +21,8 @@ import { ProtectedRoute } from "@/components/auth/protected-route"
 import { usePathname } from "next/navigation"
 import NotificationBell from "@/components/layout/notification-bell"
 import PomodoroIndicator from "@/components/layout/pomodoro-indicator"
+import { PomodoroMinimized } from "@/components/pomodoro/pomodoro-minimized"
+import { ConnectionStatus } from "@/components/ui/connection-status"
 import Image from "next/image"
 
 function ConditionalLayout({ children }: { children: React.ReactNode }) {
@@ -77,13 +79,9 @@ function ConditionalLayout({ children }: { children: React.ReactNode }) {
 
                   <PomodoroIndicator />
 
-                  {/* Status indicator melhorado */}
-                  <div className="hidden md:flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-3 py-1 border border-white/20">
-                    <div className="relative">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                      <div className="absolute inset-0 w-2 h-2 bg-green-400 rounded-full animate-ping opacity-75"></div>
-                    </div>
-                    <span className="text-white/90 text-xs font-medium">Sistema Online</span>
+                  {/* Status de conexão dinâmico */}
+                  <div className="hidden md:block">
+                    <ConnectionStatus />
                   </div>
                 </div>
               </div>
@@ -97,6 +95,7 @@ function ConditionalLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      <PomodoroMinimized />
     </ProtectedRoute>
   )
 }
@@ -109,8 +108,8 @@ export default function ClientLayout({
   return (
     <AuthProvider>
       <NotificationProvider>
-        <PomodoroProvider>
-          <StudyProvider>
+        <StudyProvider>
+          <PomodoroProvider>
             <FlashcardProvider>
               <CoachProvider>
                 <ReviewProvider>
@@ -130,8 +129,8 @@ export default function ClientLayout({
                 </ReviewProvider>
               </CoachProvider>
             </FlashcardProvider>
-          </StudyProvider>
-        </PomodoroProvider>
+          </PomodoroProvider>
+        </StudyProvider>
       </NotificationProvider>
     </AuthProvider>
   )

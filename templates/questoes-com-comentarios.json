@@ -1,0 +1,75 @@
+[
+  {
+    "disciplina": "Português",
+    "assunto": "Compreensão e interpretação de textos",
+    "enunciado": "Leia o texto a seguir e responda à questão:\n\nA tecnologia tem transformado profundamente a forma como nos comunicamos. As redes sociais, por exemplo, permitem que pessoas de diferentes partes do mundo se conectem instantaneamente. No entanto, essa facilidade de comunicação também traz desafios, como a disseminação de informações falsas e o isolamento social.\n\nCom base no texto, qual é a principal ideia apresentada?",
+    "opcaoA": "A tecnologia sempre traz benefícios para a sociedade",
+    "opcaoB": "As redes sociais são prejudiciais para a comunicação",
+    "opcaoC": "A tecnologia transforma a comunicação, mas também apresenta desafios",
+    "opcaoD": "As informações falsas são o único problema das redes sociais",
+    "opcaoE": "O isolamento social é causado apenas pela tecnologia",
+    "alternativaCorreta": "C",
+    "nivel": "médio",
+    "comentario": "Esta questão trabalha com a habilidade de identificar a ideia central de um texto. O texto apresenta tanto aspectos positivos quanto negativos da tecnologia na comunicação, sendo a alternativa C a que melhor resume essa dualidade.",
+    "explanation": "A alternativa C é correta porque o texto apresenta uma visão equilibrada sobre a tecnologia: por um lado, destaca os benefícios (conexão instantânea entre pessoas), e por outro, aponta os desafios (desinformação e isolamento). As outras alternativas são incorretas por serem unilaterais ou não representarem adequadamente o conteúdo do texto."
+  },
+  {
+    "disciplina": "Matemática",
+    "assunto": "Álgebra",
+    "enunciado": "Resolva a equação: 2x + 5 = 13",
+    "opcaoA": "x = 3",
+    "opcaoB": "x = 4",
+    "opcaoC": "x = 5",
+    "opcaoD": "x = 6",
+    "opcaoE": "x = 7",
+    "alternativaCorreta": "B",
+    "nivel": "fácil",
+    "comentario": "Esta é uma equação do primeiro grau simples. O aluno deve isolar a incógnita x para encontrar o valor correto.",
+    "explanation": "Para resolver a equação 2x + 5 = 13:\n1) Subtraia 5 dos dois lados: 2x = 8\n2) Divida ambos os lados por 2: x = 4\n\nPortanto, x = 4 é a solução correta."
+  },
+  {
+    "disciplina": "História",
+    "assunto": "História do Brasil",
+    "enunciado": "Qual foi o principal produto de exportação do Brasil durante o período colonial?",
+    "opcaoA": "Ouro",
+    "opcaoB": "Açúcar",
+    "opcaoC": "Café",
+    "opcaoD": "Borracha",
+    "opcaoE": "Algodão",
+    "alternativaCorreta": "B",
+    "nivel": "médio",
+    "comentario": "Esta questão aborda a economia colonial brasileira, especificamente o ciclo do açúcar que foi o principal produto de exportação durante a maior parte do período colonial.",
+    "explanation": "O açúcar foi o principal produto de exportação do Brasil durante o período colonial (séculos XVI-XVIII). O ciclo do açúcar começou no século XVI e perdurou até o século XVIII, quando o ouro se tornou mais importante. O café só se tornou relevante no século XIX, e a borracha no final do século XIX."
+  },
+  {
+    "disciplina": "Geografia",
+    "assunto": "Geografia física",
+    "enunciado": "Qual é o maior bioma brasileiro em extensão territorial?",
+    "opcaoA": "Mata Atlântica",
+    "opcaoB": "Cerrado",
+    "opcaoC": "Amazônia",
+    "opcaoD": "Caatinga",
+    "opcaoE": "Pampa",
+    "alternativaCorreta": "C",
+    "nivel": "fácil",
+    "comentario": "Esta questão testa o conhecimento sobre os biomas brasileiros e suas extensões territoriais.",
+    "explanation": "A Amazônia é o maior bioma brasileiro, ocupando aproximadamente 49% do território nacional. Ela se estende por nove estados brasileiros e é considerada a maior floresta tropical do mundo."
+  },
+  {
+    "disciplina": "Ciências",
+    "assunto": "Biologia",
+    "enunciado": "Qual é a função principal dos cloroplastos nas células vegetais?",
+    "opcaoA": "Respiração celular",
+    "opcaoB": "Fotossíntese",
+    "opcaoC": "Digestão celular",
+    "opcaoD": "Reprodução celular",
+    "opcaoE": "Transporte de nutrientes",
+    "alternativaCorreta": "B",
+    "nivel": "médio",
+    "comentario": "Esta questão aborda a estrutura e função das organelas celulares, especificamente os cloroplastos que são exclusivos das células vegetais.",
+    "explanation": "Os cloroplastos são organelas responsáveis pela fotossíntese, processo pelo qual as plantas convertem energia luminosa em energia química (glicose). Eles contêm clorofila, pigmento que captura a luz solar necessária para esse processo."
+  }
+]
+
+
+

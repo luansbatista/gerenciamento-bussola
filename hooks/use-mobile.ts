@@ -4,8 +4,11 @@ const MOBILE_BREAKPOINT = 768
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean>(false)
+  const [isClient, setIsClient] = React.useState<boolean>(false)
 
   React.useEffect(() => {
+    setIsClient(true)
+    
     // Função para verificar se é mobile
     const checkIsMobile = () => {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
@@ -26,5 +29,6 @@ export function useIsMobile() {
     return () => mql.removeEventListener("change", onChange)
   }, [])
 
-  return isMobile
+  // Retornar false durante SSR para evitar problemas de hidratação
+  return isClient ? isMobile : false
 }

@@ -1,19 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
-import { usePomodoro } from "./pomodoro-context"
 import { createClient } from "@/utils/supabase/client"
-
-interface StudySession {
-  id: string
-  subject: string
-  topic: string
-  duration: number // in minutes
-  questionsAnswered: number
-  correctAnswers: number
-  date: string
-  type: "pomodoro" | "questions" | "exam"
-}
+import type { Subject, Question, StudySession } from "./types"
 
 interface DailyGoal {
   id: string
@@ -30,16 +19,19 @@ interface DailyGoal {
 interface StudyContextType {
   studySessions: StudySession[]
   dailyGoals: DailyGoal[]
+  setDailyGoals: (goals: DailyGoal[]) => void
   addStudySession: (session: Omit<StudySession, "id" | "date">) => void
   updateGoalProgress: (goalId: string, progress: number) => void
   createGoal: (goal: Omit<DailyGoal, "id" | "current" | "completed">) => void
   deleteGoal: (goalId: string) => void
   getTodayStudyTime: () => number
-  getTodayQuestionsCount: () => number
+  getTodayQuestionsCount: () => Promise<number>
   getWeeklyStats: (userId?: string) => Promise<{ totalHours: number; totalQuestions: number; accuracy: number }>
   getSubjectProgress: (subject: string, userId?: string) => Promise<{ hours: number; questions: number; accuracy: number }>
   getSubjects: () => Promise<{ id: string; name: string; color: string }[]>
   refreshStats: () => void
+  updateStudyTime: (minutes: number, subject?: string) => void
+  syncPomodoroTime: (pomodoroTime: number) => void
 }
 
 const StudyContext = createContext<StudyContextType | undefined>(undefined)
@@ -47,7 +39,7 @@ const StudyContext = createContext<StudyContextType | undefined>(undefined)
 export function StudyProvider({ children }: { children: ReactNode }) {
   const [studySessions, setStudySessions] = useState<StudySession[]>([])
   const [dailyGoals, setDailyGoals] = useState<DailyGoal[]>([])
-  const { totalFocusTime, sessionsCompleted } = usePomodoro()
+  const [totalFocusTime, setTotalFocusTime] = useState(0)
 
   // Load data from localStorage
   useEffect(() => {
@@ -121,13 +113,15 @@ export function StudyProvider({ children }: { children: ReactNode }) {
         return goal
       }),
     )
+
+    // Disparar evento de atualização de estatísticas
+    window.dispatchEvent(new CustomEvent('statsUpdated'))
   }, [totalFocusTime])
 
-  const addStudySession = (session: Omit<StudySession, "id" | "date">) => {
+  const addStudySession = (session: Omit<StudySession, "id">) => {
     const newSession: StudySession = {
       ...session,
       id: Date.now().toString(),
-      date: new Date().toISOString(),
     }
 
     setStudySessions((prev) => [...prev, newSession])
@@ -181,43 +175,69 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   }
 
   const getTodayStudyTime = () => {
-    const today = new Date().toDateString()
-    return studySessions
-      .filter((session) => new Date(session.date).toDateString() === today)
-      .reduce((total, session) => total + session.duration, 0)
+    // Usar o tempo do Pomodoro convertido para horas
+    return totalFocusTime / 60
   }
 
-  const getTodayQuestionsCount = () => {
-    const today = new Date().toDateString()
-    return studySessions
-      .filter((session) => new Date(session.date).toDateString() === today)
-      .reduce((total, session) => total + session.questionsAnswered, 0)
-  }
+  const getTodayQuestionsCount = useCallback(async () => {
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user?.id) {
+        return 0
+      }
 
-  const getWeeklyStats = async (userId?: string) => {
+      const today = new Date().toISOString().split('T')[0]
+      
+      const { data, error } = await supabase
+        .from('question_attempts')
+        .select('id')
+        .eq('user_id', user.id)
+        .gte('attempted_at', today + 'T00:00:00')
+        .lt('attempted_at', today + 'T23:59:59')
+
+      if (error) {
+        console.warn('Erro ao buscar questões de hoje:', error)
+        return 0
+      }
+
+      return data?.length || 0
+    } catch (error) {
+      console.error('Erro em getTodayQuestionsCount:', error)
+      return 0
+    }
+  }, [])
+
+  const getWeeklyStats = useCallback(async (userId?: string) => {
     try {
       const supabase = createClient()
       
-      // Se não foi passado userId, tentar obter do auth
       let currentUserId = userId
       if (!currentUserId) {
         const { data: { user } } = await supabase.auth.getUser()
         currentUserId = user?.id
       }
-
+      
       if (!currentUserId) {
         return { totalHours: 0, totalQuestions: 0, accuracy: 0 }
       }
 
-      const { data: attempts, error } = await supabase
+      // Buscar tentativas da última semana
+      const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      
+      const { data, error } = await supabase
         .from('question_attempts')
         .select('*')
         .eq('user_id', currentUserId)
-        .gte('attempted_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .gte('attempted_at', oneWeekAgo)
 
       if (error) {
+        console.error('❌ Erro ao buscar tentativas:', error)
         return { totalHours: 0, totalQuestions: 0, accuracy: 0 }
       }
+
+      const attempts = data || []
 
       if (!attempts || !Array.isArray(attempts)) {
         return { totalHours: 0, totalQuestions: 0, accuracy: 0 }
@@ -226,13 +246,17 @@ export function StudyProvider({ children }: { children: ReactNode }) {
       const totalQuestions = attempts.length
       const correctAnswers = attempts.filter(a => a.is_correct).length
       const accuracy = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0
-      const totalHours = totalQuestions * 2 / 60 // Estimativa: 2 minutos por questão
-
-      return { totalHours, totalQuestions, accuracy }
+      
+      // Retornar apenas os dados do banco, o tempo do Pomodoro será adicionado pelos componentes
+      return { totalHours: 0, totalQuestions, accuracy }
     } catch (error) {
+      console.error('❌ Erro em getWeeklyStats:', {
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+        userId: userId
+      })
       return { totalHours: 0, totalQuestions: 0, accuracy: 0 }
     }
-  }
+  }, [])
 
   const getSubjectProgress = useCallback(async (subject: string, userId?: string) => {
     try {
@@ -339,10 +363,21 @@ export function StudyProvider({ children }: { children: ReactNode }) {
         }
       })
       
-      const subjects = Array.from(uniqueSubjects).map((subjectName: string) => ({
+      const subjects = Array.from(uniqueSubjects).map((subjectName: string, index: number) => ({
         id: subjectName, // Usar o nome como ID temporário
         name: subjectName,
-        color: '#3B82F6' // Cor padrão
+        color: [
+          '#3B82F6', // Azul
+          '#10B981', // Verde
+          '#F59E0B', // Amarelo
+          '#EF4444', // Vermelho
+          '#8B5CF6', // Roxo
+          '#06B6D4', // Ciano
+          '#84CC16', // Verde lima
+          '#F97316', // Laranja
+          '#EC4899', // Rosa
+          '#6366F1', // Índigo
+        ][index % 10]
       }))
       
       return subjects
@@ -357,19 +392,58 @@ export function StudyProvider({ children }: { children: ReactNode }) {
     window.dispatchEvent(new CustomEvent('statsUpdated'))
   }, [])
 
+  // Função para atualizar o tempo de estudo
+  const updateStudyTime = useCallback((minutes: number, subject?: string) => {
+    // Atualizar tempo total de foco
+    setTotalFocusTime(prev => prev + minutes)
+    
+    // Atualizar metas baseadas em horas
+    setDailyGoals(prev => prev.map(goal => {
+      if (goal.category === 'hours' && goal.type === 'daily') {
+        const newTotalTime = totalFocusTime + minutes
+        const currentHours = Math.floor((newTotalTime / 60) * 100) / 100
+        return {
+          ...goal,
+          current: currentHours
+        }
+      }
+      return goal
+    }))
+  }, [totalFocusTime])
+
+  // Função para sincronizar tempo do pomodoro
+  const syncPomodoroTime = useCallback((pomodoroTime: number) => {
+    setTotalFocusTime(pomodoroTime)
+    
+    // Atualizar metas baseadas em horas
+    setDailyGoals(prev => prev.map(goal => {
+      if (goal.category === 'hours' && goal.type === 'daily') {
+        const currentHours = Math.floor((pomodoroTime / 60) * 100) / 100
+        return {
+          ...goal,
+          current: currentHours
+        }
+      }
+      return goal
+    }))
+  }, [])
+
   const value: StudyContextType = {
-    studySessions,
-    dailyGoals,
-    addStudySession,
-    updateGoalProgress,
-    createGoal,
-    deleteGoal,
-    getTodayStudyTime,
-    getTodayQuestionsCount,
-    getWeeklyStats,
-    getSubjectProgress,
-    getSubjects,
-    refreshStats,
+            studySessions,
+        dailyGoals,
+        setDailyGoals,
+        addStudySession,
+        updateGoalProgress,
+        createGoal,
+        deleteGoal,
+        getTodayStudyTime,
+        getTodayQuestionsCount,
+        getWeeklyStats,
+        getSubjectProgress,
+        getSubjects,
+        refreshStats,
+        updateStudyTime,
+        syncPomodoroTime,
   }
 
   return <StudyContext.Provider value={value}>{children}</StudyContext.Provider>

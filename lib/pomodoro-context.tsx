@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react"
+import { useStudy } from "./study-context"
 
 type TimerState = "idle" | "running" | "paused"
 type SessionType = "work" | "shortBreak" | "longBreak"
@@ -30,6 +31,7 @@ interface PomodoroContextType {
   getSessionLabel: () => string
   getSessionColor: () => string
   progress: number
+  syncStudyTime: (studyTime: number) => void
 }
 
 const PomodoroContext = createContext<PomodoroContextType | undefined>(undefined)
@@ -49,6 +51,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const [sessionsCompleted, setSessionsCompleted] = useState(0)
   const [totalFocusTime, setTotalFocusTime] = useState(0)
   const [settings, setSettings] = useState<PomodoroSettings>(defaultSettings)
+  const { updateStudyTime, syncPomodoroTime } = useStudy()
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -65,11 +68,16 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
         setSessionsCompleted(parsed.sessionsCompleted || 0)
         setTotalFocusTime(parsed.totalFocusTime || 0)
         setSettings(parsed.settings || defaultSettings)
+        
+        // Sincronizar tempo com o StudyProvider
+        if (parsed.totalFocusTime > 0) {
+          syncPomodoroTime(parsed.totalFocusTime)
+        }
       } catch (error) {
         console.error("Error loading Pomodoro state:", error)
       }
     }
-  }, [])
+  }, [syncPomodoroTime])
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
@@ -125,7 +133,17 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
 
     if (sessionType === "work") {
       setSessionsCompleted((prev) => prev + 1)
-      setTotalFocusTime((prev) => prev + settings.workDuration)
+      const newFocusTime = totalFocusTime + settings.workDuration
+      setTotalFocusTime(newFocusTime)
+      
+      // Atualizar o tempo de estudo no contexto de estudos
+      updateStudyTime(settings.workDuration, selectedSubject)
+      
+      // Sincronizar tempo total com o StudyProvider
+      syncPomodoroTime(newFocusTime)
+
+      // Disparar evento de atualização de estatísticas
+      window.dispatchEvent(new CustomEvent('statsUpdated'))
 
       // Determine next session type
       const nextSessionsCompleted = sessionsCompleted + 1
@@ -249,6 +267,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     getSessionLabel,
     getSessionColor,
     progress,
+    syncStudyTime: (studyTime: number) => {
+      setTotalFocusTime(studyTime)
+    },
   }
 
   return <PomodoroContext.Provider value={value}>{children}</PomodoroContext.Provider>

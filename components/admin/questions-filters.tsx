@@ -9,10 +9,14 @@ import { Search, Filter, X } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 
 interface Assunto {
-  id: number
-  disciplina: string
-  assunto: string
-  percentual: number
+  id: string
+  subject_id: string
+  topic_name: string
+  percentage: number
+  priority: number
+  subjects?: {
+    name: string
+  }
 }
 
 interface QuestionsFiltersProps {
@@ -30,14 +34,12 @@ export function QuestionsFilters({ onFiltersChange }: QuestionsFiltersProps) {
   const [filteredAssuntos, setFilteredAssuntos] = useState<Assunto[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-
-  
   const [selectedDisciplina, setSelectedDisciplina] = useState<string>("all")
   const [selectedAssunto, setSelectedAssunto] = useState<string>("all")
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState<string>("")
 
-  // Buscar disciplinas e assuntos do edital
+  // Buscar disciplinas e assuntos da tabela subjects_topics
   const fetchAssuntos = useCallback(async () => {
     if (isLoading) return // Evitar múltiplas chamadas
     
@@ -45,10 +47,15 @@ export function QuestionsFilters({ onFiltersChange }: QuestionsFiltersProps) {
     try {
       const supabase = createClient()
       const { data, error } = await supabase
-        .from('assuntos_edital')
-        .select('*')
-        .order('disciplina')
-        .order('assunto')
+        .from('subjects_topics')
+        .select(`
+          *,
+          subjects:subject_id (
+            name
+          )
+        `)
+        .order('subject_id')
+        .order('topic_name')
 
       if (error) {
         console.error('Erro ao buscar assuntos:', error)
@@ -58,7 +65,7 @@ export function QuestionsFilters({ onFiltersChange }: QuestionsFiltersProps) {
       setAssuntos(data || [])
       
       // Extrair disciplinas únicas
-      const disciplinasUnicas = [...new Set(data?.map(a => a.disciplina) || [])]
+      const disciplinasUnicas = [...new Set(data?.map(a => a.subjects?.name || `Subject ID: ${a.subject_id}`) || [])]
       setDisciplinas(disciplinasUnicas)
     } catch (error) {
       console.error('Erro ao buscar assuntos:', error)
@@ -75,7 +82,7 @@ export function QuestionsFilters({ onFiltersChange }: QuestionsFiltersProps) {
   // Filtrar assuntos quando disciplina muda
   useEffect(() => {
     if (selectedDisciplina && selectedDisciplina !== "all") {
-      const filtrados = assuntos.filter(a => a.disciplina === selectedDisciplina)
+      const filtrados = assuntos.filter(a => a.subjects?.name === selectedDisciplina)
       setFilteredAssuntos(filtrados)
       setSelectedAssunto("all") // Reset assunto quando disciplina muda
     } else {
@@ -84,19 +91,19 @@ export function QuestionsFilters({ onFiltersChange }: QuestionsFiltersProps) {
     }
   }, [selectedDisciplina, assuntos])
 
-            // Aplicar filtros com debounce
-          useEffect(() => {
-            const timeoutId = setTimeout(() => {
-              onFiltersChange({
-                disciplina: selectedDisciplina === "all" ? undefined : selectedDisciplina || undefined,
-                assunto: selectedAssunto === "all" ? undefined : selectedAssunto || undefined,
-                difficulty: selectedDifficulty === "all" ? undefined : selectedDifficulty || undefined,
-                search: searchTerm || undefined
-              })
-            }, 300) // Debounce de 300ms
+  // Aplicar filtros com debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      onFiltersChange({
+        disciplina: selectedDisciplina === "all" ? undefined : selectedDisciplina || undefined,
+        assunto: selectedAssunto === "all" ? undefined : selectedAssunto || undefined,
+        difficulty: selectedDifficulty === "all" ? undefined : selectedDifficulty || undefined,
+        search: searchTerm || undefined
+      })
+    }, 300) // Debounce de 300ms
 
-            return () => clearTimeout(timeoutId)
-          }, [selectedDisciplina, selectedAssunto, selectedDifficulty, searchTerm, onFiltersChange])
+    return () => clearTimeout(timeoutId)
+  }, [selectedDisciplina, selectedAssunto, selectedDifficulty, searchTerm, onFiltersChange])
 
   const clearFilters = useCallback(() => {
     setSelectedDisciplina("all")
@@ -164,8 +171,8 @@ export function QuestionsFilters({ onFiltersChange }: QuestionsFiltersProps) {
               <SelectContent>
                 <SelectItem value="all">Todos os assuntos</SelectItem>
                 {filteredAssuntos.map((assunto) => (
-                  <SelectItem key={assunto.id} value={assunto.assunto}>
-                    {assunto.assunto}
+                  <SelectItem key={assunto.id} value={assunto.topic_name}>
+                    {assunto.topic_name}
                   </SelectItem>
                 ))}
               </SelectContent>

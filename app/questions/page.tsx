@@ -24,12 +24,14 @@ export default function QuestionsPage() {
   const supabase = createClient()
   const [selectedSubject, setSelectedSubject] = useState<string>("all")
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>("all")
+  const [selectedStatus, setSelectedStatus] = useState<string>("unanswered") // unanswered, correct, incorrect
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [showFilters, setShowFilters] = useState(false)
   const [answeredQuestions, setAnsweredQuestions] = useState<Record<string, number>>({})
   const [showExplanation, setShowExplanation] = useState<Record<string, boolean>>({})
   const [userAttempts, setUserAttempts] = useState<Record<string, number>>({})
   const [isLoadingAttempts, setIsLoadingAttempts] = useState(false)
+  const [isUpdatingStats, setIsUpdatingStats] = useState(false)
 
   // Buscar tentativas do usuário do banco de dados
   const fetchUserAttempts = async () => {
@@ -38,14 +40,21 @@ export default function QuestionsPage() {
       return
     }
     
-    setIsLoadingAttempts(true)
     try {
-      const { data, error } = await supabase
+      // Adicionar timeout para evitar travamento
+      const queryPromise = supabase
         .from('question_attempts')
         .select('question_id, selected_answer, is_correct')
         .eq('user_id', user.id)
 
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout na busca de tentativas')), 5000)
+      )
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
+
       if (error) {
+        console.error('❌ Erro ao buscar tentativas:', error)
         setUserAttempts({})
         return
       }
@@ -68,31 +77,73 @@ export default function QuestionsPage() {
         setUserAttempts({})
       }
     } catch (error) {
+      console.error('❌ Erro ao buscar tentativas:', error)
       setUserAttempts({})
-    } finally {
-      setIsLoadingAttempts(false)
     }
   }
 
   // Carregar tentativas quando o usuário mudar
   useEffect(() => {
     if (user?.id) {
-      fetchUserAttempts()
-    }
-  }, [user?.id])
-
-  // Carregar tentativas quando o componente é montado
-  useEffect(() => {
-    if (user?.id) {
-      // Carregar tentativas imediatamente
     fetchUserAttempts()
-      // E também após um pequeno delay para garantir que tudo foi carregado
-      setTimeout(() => fetchUserAttempts(), 1000)
     }
   }, [user?.id])
 
   // Combinar tentativas do banco com respostas da sessão atual
   const allAnsweredQuestions = { ...userAttempts, ...answeredQuestions }
+
+  // Buscar tentativas do banco para verificar status das questões
+  const fetchQuestionAttempts = async () => {
+    if (!user?.id) return {}
+    
+    try {
+      // Adicionar timeout para evitar travamento
+      const queryPromise = supabase
+        .from('question_attempts')
+        .select('question_id, is_correct')
+        .eq('user_id', user.id)
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout na busca de status')), 5000)
+      )
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
+
+      if (error) {
+        console.error('❌ Erro ao buscar tentativas para filtro:', error)
+        return {}
+      }
+
+      if (data && Array.isArray(data)) {
+        const attemptsMap: Record<string, { answered: boolean, correct: boolean }> = {}
+        data.forEach(attempt => {
+          attemptsMap[attempt.question_id] = {
+            answered: true,
+            correct: attempt.is_correct
+          }
+        })
+        return attemptsMap
+      }
+      return {}
+    } catch (error) {
+      console.error('❌ Erro ao buscar tentativas para filtro:', error)
+      return {}
+    }
+  }
+
+  // Estado para armazenar o status das questões
+  const [questionStatuses, setQuestionStatuses] = useState<Record<string, { answered: boolean, correct: boolean }>>({})
+
+  // Carregar status das questões
+  useEffect(() => {
+    const loadQuestionStatuses = async () => {
+      if (user?.id) {
+        const statuses = await fetchQuestionAttempts()
+        setQuestionStatuses(statuses)
+      }
+    }
+    loadQuestionStatuses()
+  }, [user?.id])
 
   // Filter questions based on selected criteria
   const filteredQuestions = questions.filter((question) => {
@@ -126,10 +177,43 @@ export default function QuestionsPage() {
         return false
       }
     }
+
+    // Filtro por status da questão
+    if (selectedStatus !== "all") {
+      const questionStatus = questionStatuses[question.id]
+      
+      if (selectedStatus === "unanswered") {
+        // Mostrar apenas questões não respondidas
+        if (questionStatus?.answered) {
+          return false
+        }
+      } else if (selectedStatus === "correct") {
+        // Mostrar apenas questões acertadas
+        if (!questionStatus?.answered || !questionStatus?.correct) {
+          return false
+        }
+      } else if (selectedStatus === "incorrect") {
+        // Mostrar apenas questões erradas
+        if (!questionStatus?.answered || questionStatus?.correct) {
+          return false
+        }
+      }
+    }
     
     return true
   })
 
+  // Log para debug do filtro
+  useEffect(() => {
+    console.log('🔍 Filtro aplicado:', {
+      selectedSubject,
+      selectedDifficulty,
+      selectedStatus,
+      totalQuestions: questions.length,
+      filteredQuestions: filteredQuestions.length,
+      questionStatusesCount: Object.keys(questionStatuses).length
+    })
+  }, [selectedSubject, selectedDifficulty, selectedStatus, questions.length, filteredQuestions.length, questionStatuses])
 
 
   const currentQuestion = filteredQuestions[currentQuestionIndex]
@@ -144,9 +228,7 @@ export default function QuestionsPage() {
 
   // Buscar estatísticas do banco de dados
   const fetchStatsFromDB = async () => {
-    console.log('🔄 fetchStatsFromDB iniciado')
     if (!user?.id) {
-      console.log('❌ Usuário não encontrado')
       // Resetar estatísticas se não há usuário
       setStatsFromDB({
         answeredCount: 0,
@@ -157,39 +239,38 @@ export default function QuestionsPage() {
     }
     
     try {
-      console.log('📊 Fazendo query no banco...')
-      const { data, error } = await supabase
+      // Pequeno delay para garantir que o banco processou a inserção
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // Adicionar timeout para evitar travamento
+      const queryPromise = supabase
         .from('question_attempts')
         .select('is_correct')
         .eq('user_id', user.id)
 
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout na query')), 5000)
+      )
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
+
       if (error) {
         console.error('❌ Erro na query:', error)
-        // Em caso de erro, manter estatísticas atuais ou resetar
+        // Em caso de erro, manter estatísticas atuais
         return
       }
-
-      console.log('📊 Dados recebidos:', data?.length || 0, 'tentativas')
 
       if (data && Array.isArray(data)) {
         const answeredCount = data.length
         const correctCount = data.filter(attempt => attempt.is_correct).length
         const accuracyRate = answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0
         
-        console.log('📊 Estatísticas calculadas:', {
-          answeredCount,
-          correctCount,
-          accuracyRate
-        })
-        
         setStatsFromDB({
           answeredCount,
           correctCount,
           accuracyRate
         })
-        console.log('✅ Estatísticas atualizadas no estado')
       } else {
-        console.log('📊 Nenhum dado encontrado, resetando para zero')
         // Se não há dados, resetar para zero
         setStatsFromDB({
           answeredCount: 0,
@@ -210,65 +291,45 @@ export default function QuestionsPage() {
     }
   }, [user?.id])
 
-  // Carregar estatísticas quando o componente é montado
-  useEffect(() => {
-    if (user?.id) {
-      // Carregar estatísticas imediatamente
-      fetchStatsFromDB()
-      // E também após um pequeno delay para garantir que tudo foi carregado
-      setTimeout(() => fetchStatsFromDB(), 1000)
-    }
-  }, [user?.id])
-
-  // Recarregar estatísticas periodicamente para garantir sincronização
-  useEffect(() => {
-    if (!user?.id) return
-    
-    const interval = setInterval(() => {
-    fetchStatsFromDB()
-    }, 30000) // Recarregar a cada 30 segundos
-    
-    return () => clearInterval(interval)
-  }, [user?.id])
-
-  // Forçar recarregamento quando a página é carregada
-  useEffect(() => {
-    if (user?.id) {
-      // Testar conexão com banco
-      testDatabaseConnection()
-      
-      // Recarregar após um delay para garantir que tudo foi inicializado
-      const timer = setTimeout(() => {
-        forceRefreshStats()
-      }, 2000)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [user?.id])
+  // Remover recarregamento automático que pode causar travamentos
+  // useEffect(() => {
+  //   if (!user?.id) return
+  //   
+  //   const interval = setInterval(() => {
+  //     fetchStatsFromDB()
+  //   }, 60000) // Recarregar a cada 1 minuto
+  //   
+  //   return () => clearInterval(interval)
+  // }, [user?.id])
 
   // Atualizar estatísticas quando uma nova resposta for salva
   const refreshLocalStats = async () => {
-    console.log('🔄 refreshLocalStats iniciado')
     try {
+      setIsUpdatingStats(true)
+      
       // Atualizar estatísticas do banco de dados
-      console.log('📊 Chamando fetchStatsFromDB...')
       await fetchStatsFromDB()
-      console.log('📊 fetchStatsFromDB concluído')
       
-      // Atualizar tentativas do usuário
-      console.log('👤 Chamando fetchUserAttempts...')
-      await fetchUserAttempts()
-      console.log('👤 fetchUserAttempts concluído')
+      // Atualizar tentativas do usuário de forma assíncrona
+      fetchUserAttempts().catch(error => {
+        console.error('❌ Erro ao atualizar tentativas:', error)
+      })
       
-      console.log('✅ refreshLocalStats concluído com sucesso')
+      // Atualizar status das questões para filtros de forma assíncrona
+      if (user?.id) {
+        fetchQuestionAttempts().then(statuses => {
+          setQuestionStatuses(statuses)
+        }).catch(error => {
+          console.error('❌ Erro ao atualizar status das questões:', error)
+        })
+      }
+      
+      // Disparar evento para atualizar outros componentes
+      window.dispatchEvent(new CustomEvent('statsUpdated'))
     } catch (error) {
       console.error('❌ Erro em refreshLocalStats:', error)
-      // Em caso de erro, tentar novamente após um delay
-      setTimeout(() => {
-        console.log('🔄 Tentando novamente após erro...')
-        fetchStatsFromDB()
-        fetchUserAttempts()
-      }, 1000)
+    } finally {
+      setIsUpdatingStats(false)
     }
   }
 
@@ -323,35 +384,13 @@ export default function QuestionsPage() {
       }
 
       // Atualizar UI imediatamente
-    setAnsweredQuestions((prev) => ({ ...prev, [questionId]: selectedAnswer }))
-    setShowExplanation((prev) => ({ ...prev, [questionId]: true }))
+      setAnsweredQuestions((prev) => ({ ...prev, [questionId]: selectedAnswer }))
+      setShowExplanation((prev) => ({ ...prev, [questionId]: true }))
 
       // Buscar questão atual
       const currentQuestion = questions.find(q => q.id === questionId)
       if (!currentQuestion) {
-        console.error('Questão não encontrada no array local:', { questionId })
-        return
-      }
-
-      // Verificar se a questão existe no banco
-      const { data: questionExists, error: questionError } = await supabase
-        .from('questions')
-        .select('id')
-        .eq('id', questionId)
-        .single()
-      
-      if (questionError) {
-        console.error('Erro ao verificar questão no banco:', {
-        questionId, 
-          error: questionError,
-          message: questionError.message,
-          code: questionError.code
-        })
-        return
-      }
-
-      if (!questionExists) {
-        console.error('Questão não encontrada no banco:', { questionId })
+        console.error('Questão não encontrada:', { questionId })
         return
       }
 
@@ -359,19 +398,6 @@ export default function QuestionsPage() {
       const correctAnswer = currentQuestion.correct_answer
       const isCorrect = selectedAnswer === correctAnswer
 
-      // Atualizar estatísticas localmente para feedback imediato
-      setStatsFromDB(prev => {
-        const newAnsweredCount = prev.answeredCount + 1
-        const newCorrectCount = isCorrect ? prev.correctCount + 1 : prev.correctCount
-        const newAccuracyRate = newAnsweredCount > 0 ? Math.round((newCorrectCount / newAnsweredCount) * 100) : 0
-        
-        return {
-          answeredCount: newAnsweredCount,
-          correctCount: newCorrectCount,
-          accuracyRate: newAccuracyRate
-        }
-      })
-      
       // Preparar dados para inserção
       const now = new Date()
       const answerLetter = String.fromCharCode(97 + selectedAnswer).toUpperCase() // 0->A, 1->B, 2->C, 3->D, 4->E
@@ -385,27 +411,23 @@ export default function QuestionsPage() {
         time_spent: 0
       }
 
-      console.log('Tentando salvar resposta:', insertData)
-
-      // Tentar inserir no banco
-      const { data, error } = await supabase
+      // Tentar inserir no banco com timeout
+      const insertPromise = supabase
         .from('question_attempts')
         .insert(insertData)
         .select()
 
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout na inserção')), 10000)
+      )
+
+      const { data, error } = await Promise.race([insertPromise, timeoutPromise]) as any
+
       if (error) {
-        console.error('Erro ao inserir resposta:', {
-          error: error,
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint
-        })
+        console.error('❌ Erro ao salvar resposta:', error)
         
         // Se for erro de UNIQUE constraint, tentar atualizar
         if (error.code === '23505') {
-          console.log('Tentando atualizar resposta existente...')
-          
           const { error: updateError } = await supabase
             .from('question_attempts')
             .update({
@@ -418,54 +440,27 @@ export default function QuestionsPage() {
             .eq('user_id', user.id)
           
           if (updateError) {
-            console.error('Erro ao atualizar resposta:', {
-              error: updateError,
-              message: updateError.message,
-              code: updateError.code,
-              details: updateError.details
-            })
-            throw new Error(`Falha ao atualizar resposta: ${updateError.message}`)
+            console.error('❌ Erro ao atualizar resposta:', updateError)
+            return
           }
-          
-          console.log('Resposta atualizada com sucesso')
         } else {
-          // Outros tipos de erro
-          throw new Error(`Falha ao salvar resposta: ${error.message}`)
+          console.error('❌ Erro na inserção, mas continuando...')
+          return
         }
-      } else {
-        console.log('Resposta salva com sucesso:', data)
       }
 
-      // Atualizar estatísticas após sucesso
-      console.log('🔄 Iniciando atualização de estatísticas...')
-      setTimeout(() => {
-        console.log('📊 Chamando refreshLocalStats...')
-        refreshLocalStats()
-        console.log('📡 Disparando evento statsUpdated...')
-        refreshStats() // Disparar evento para atualizar Dashboard
-        console.log('✅ Atualização de estatísticas concluída')
+      // Atualizar estatísticas de forma assíncrona para não bloquear a UI
+      setTimeout(async () => {
+        try {
+          await refreshLocalStats()
+          refreshStats() // Disparar evento para atualizar Dashboard
+        } catch (error) {
+          console.error('❌ Erro ao atualizar estatísticas:', error)
+        }
       }, 100)
 
     } catch (error) {
-      // Tratamento robusto de erro
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao salvar resposta'
-      const errorDetails = {
-        message: errorMessage,
-        questionId,
-        userId: user?.id,
-        selectedAnswer,
-        timestamp: new Date().toISOString()
-      }
-      
-      console.error('Erro geral ao salvar resposta:', errorDetails)
-      
-      // Reverter estatísticas locais em caso de erro
-      setStatsFromDB(prev => ({
-        answeredCount: Math.max(0, prev.answeredCount - 1),
-        correctCount: prev.correctCount, // Manter como estava
-        accuracyRate: prev.answeredCount > 1 ? 
-          Math.round((prev.correctCount / (prev.answeredCount - 1)) * 100) : 0
-      }))
+      console.error('❌ Erro ao salvar resposta:', error)
     }
   }
 
@@ -517,7 +512,11 @@ export default function QuestionsPage() {
             </div>
             <Button
               variant="outline"
-              onClick={() => setShowFilters(!showFilters)}
+              onClick={() => {
+                console.log('🔍 Botão filtro clicado, estado atual:', showFilters)
+                setShowFilters(!showFilters)
+                console.log('🔍 Novo estado:', !showFilters)
+              }}
               className="flex items-center gap-2 px-6 py-3 font-medium bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 transition-all duration-300"
             >
               <Filter className="h-4 w-4" />
@@ -533,19 +532,21 @@ export default function QuestionsPage() {
             totalQuestions={questions.length} 
             answeredCount={statsFromDB.answeredCount} 
             correctCount={statsFromDB.correctCount} 
-            isLoading={isLoadingAttempts}
+            isLoading={isLoadingAttempts || isUpdatingStats}
           />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-fade-in-up animation-delay-200">
           {/* Filters Sidebar */}
-          <div className={`lg:col-span-1 ${showFilters ? "block" : "hidden lg:block"}`}>
+          <div className={`lg:col-span-1 ${showFilters ? "block" : "hidden"} relative z-10`}>
             <QuestionFilters
               subjects={subjects}
               selectedSubject={selectedSubject}
               selectedDifficulty={selectedDifficulty}
+              selectedStatus={selectedStatus}
               onSubjectChange={setSelectedSubject}
               onDifficultyChange={setSelectedDifficulty}
+              onStatusChange={setSelectedStatus}
               totalQuestions={totalQuestionsInSystem}
               answeredToday={answeredToday}
               accuracyRate={statsFromDB.accuracyRate}
@@ -553,7 +554,7 @@ export default function QuestionsPage() {
           </div>
 
           {/* Main Question Area */}
-          <div className="lg:col-span-3 space-y-8">
+          <div className={`${showFilters ? "lg:col-span-3" : "lg:col-span-4"} space-y-8`}>
             {currentQuestion ? (
               <>
                 {/* Question Progress */}

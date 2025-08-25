@@ -33,6 +33,7 @@ interface CoachContextType {
     timeSpent: number,
     questionsAnswered?: number,
     correctAnswers?: number,
+    studyDate?: string,
   ) => void
   isTopicStudied: (subject: string, topic: string) => boolean
   getTopicStudyData: (subject: string, topic: string) => StudiedTopic | undefined
@@ -84,8 +85,10 @@ export function CoachProvider({ children }: { children: ReactNode }) {
     timeSpent: number,
     questionsAnswered = 0,
     correctAnswers = 0,
+    studyDate?: string,
   ) => {
     const existingTopic = studiedTopics.find((t) => t.subject === subject && t.topic === topic)
+    const studiedAt = studyDate ? new Date(studyDate).toISOString() : new Date().toISOString()
 
     if (existingTopic) {
       // Update existing topic
@@ -94,7 +97,7 @@ export function CoachProvider({ children }: { children: ReactNode }) {
           t.id === existingTopic.id
             ? {
                 ...t,
-                studiedAt: new Date().toISOString(),
+                studiedAt,
                 timeSpent: t.timeSpent + timeSpent,
                 questionsAnswered: t.questionsAnswered + questionsAnswered,
                 correctAnswers: t.correctAnswers + correctAnswers,
@@ -108,7 +111,7 @@ export function CoachProvider({ children }: { children: ReactNode }) {
         id: Date.now().toString(),
         subject,
         topic,
-        studiedAt: new Date().toISOString(),
+        studiedAt,
         timeSpent,
         questionsAnswered,
         correctAnswers,

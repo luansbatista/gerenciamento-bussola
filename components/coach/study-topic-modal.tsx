@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useCoach } from "@/lib/coach-context"
-import { BookOpen, Clock, Target } from "lucide-react"
+import { useReviews } from "@/lib/review-context"
+import { BookOpen, Clock, Target, Calendar } from "lucide-react"
 
 interface StudyTopicModalProps {
   open: boolean
@@ -20,23 +21,36 @@ interface StudyTopicModalProps {
 
 export function StudyTopicModal({ open, onOpenChange, subject, topic }: StudyTopicModalProps) {
   const { markTopicAsStudied } = useCoach()
+  const { addTopicForReview } = useReviews()
   const [studyData, setStudyData] = useState({
     timeSpent: 30,
     questionsAnswered: 0,
     correctAnswers: 0,
+    studyDate: new Date().toISOString().split('T')[0],
     notes: "",
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    markTopicAsStudied(subject, topic, studyData.timeSpent, studyData.questionsAnswered, studyData.correctAnswers)
+    // Marcar tópico como estudado
+    markTopicAsStudied(subject, topic, studyData.timeSpent, studyData.questionsAnswered, studyData.correctAnswers, studyData.studyDate)
+
+    // Adicionar tópico para revisão baseado na teoria do esquecimento
+    let difficulty: "easy" | "medium" | "hard" = "medium"
+    if (studyData.questionsAnswered > 0) {
+      const accuracy = (studyData.correctAnswers / studyData.questionsAnswered) * 100
+      if (accuracy >= 80) difficulty = "easy"
+      else if (accuracy < 60) difficulty = "hard"
+    }
+    addTopicForReview(subject, topic, difficulty)
 
     // Reset form
     setStudyData({
       timeSpent: 30,
       questionsAnswered: 0,
       correctAnswers: 0,
+      studyDate: new Date().toISOString().split('T')[0],
       notes: "",
     })
 
@@ -56,7 +70,20 @@ export function StudyTopicModal({ open, onOpenChange, subject, topic }: StudyTop
           </p>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="studyDate" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Data do Estudo
+              </Label>
+              <Input
+                id="studyDate"
+                type="date"
+                value={studyData.studyDate}
+                onChange={(e) => setStudyData({ ...studyData, studyDate: e.target.value })}
+                className="border-purple-200 focus:border-purple-500"
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="timeSpent" className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />

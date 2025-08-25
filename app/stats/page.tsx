@@ -88,7 +88,7 @@ export default function StatsPage() {
     }
 
     loadStats()
-  }, [user?.id, getQuestionStats, getStudyAnalytics, getWeeklyStats])
+  }, [user?.id]) // Remover dependências que causam loops infinitos
 
   const subjectStats = Object.entries(questionStats.subjectBreakdown).map(([subject, stats]) => ({
     name: subject,

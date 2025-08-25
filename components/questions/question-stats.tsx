@@ -11,6 +11,11 @@ interface QuestionStatsProps {
 export function QuestionStats({ totalQuestions, answeredCount, correctCount, isLoading = false }: QuestionStatsProps) {
   // Log para debug
   console.log('📊 QuestionStats recebeu:', { totalQuestions, answeredCount, correctCount, isLoading })
+  console.log('📊 Tipos dos valores:', {
+    totalQuestions: typeof totalQuestions,
+    answeredCount: typeof answeredCount,
+    correctCount: typeof correctCount
+  })
   
   const accuracyPercentage = answeredCount > 0 ? (correctCount / answeredCount) * 100 : 0
   const progressPercentage = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0
@@ -19,6 +24,12 @@ export function QuestionStats({ totalQuestions, answeredCount, correctCount, isL
   const safeAnsweredCount = typeof answeredCount === 'number' ? answeredCount : 0
   const safeCorrectCount = typeof correctCount === 'number' ? correctCount : 0
   const safeAccuracyPercentage = safeAnsweredCount > 0 ? (safeCorrectCount / safeAnsweredCount) * 100 : 0
+
+  console.log('📊 Valores seguros calculados:', {
+    safeAnsweredCount,
+    safeCorrectCount,
+    safeAccuracyPercentage
+  })
 
   const stats = [
     {
