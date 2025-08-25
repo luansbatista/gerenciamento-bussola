@@ -220,3 +220,5 @@ SELECT 'Políticas RLS corrigidas com sucesso!' as status;
 
 
 
+
+

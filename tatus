@@ -1,0 +1,5 @@
+[33m85479ed[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m feat: adiciona logs de debug para diagnosticar problema de dados não aparecendo no dashboard e página de questões
+[33mfe823a5[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m feat: implementar sistema de sincronização de estatísticas entre páginas
+[33mb621805[m fix: corrigir erros TypeScript no coach page - adicionar totalQuestions ao getSubjectProgress - corrigir tipo opcional do topic em recomendações
+[33m5be4ecc[m Adicionado guia de deploy para Netlify
+[33m41d1d67[m Correção: Variáveis de ambiente e configuração Supabase

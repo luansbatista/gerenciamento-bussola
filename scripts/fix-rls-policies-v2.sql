@@ -348,3 +348,4 @@ SELECT 'Políticas RLS corrigidas com sucesso! Todas as tabelas estão funcionan
 
 
 
+

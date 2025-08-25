@@ -83,3 +83,4 @@ SELECT '✅ SISTEMA FUNCIONANDO! RLS desabilitado e tabelas criadas.' as status;
 
 
 
+
