@@ -43,27 +43,37 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
+      console.log('🔄 Iniciando signup para:', email)
       await signup(name, email, password)
+      console.log('✅ Signup realizado com sucesso')
       router.push("/")
     } catch (err) {
       console.error('❌ Erro no signup:', err)
+      console.error('❌ Tipo do erro:', typeof err)
+      console.error('❌ Erro completo:', JSON.stringify(err, null, 2))
       
       // Tratar erros específicos do Supabase
       if (err instanceof Error) {
+        console.error('❌ Mensagem do erro:', err.message)
+        console.error('❌ Stack trace:', err.stack)
+        
         if (err.message.includes('already registered') || err.message.includes('User already registered')) {
           setError("Este email já está cadastrado. Tente fazer login ou use outro email.")
         } else if (err.message.includes('password')) {
           setError("A senha deve ter pelo menos 6 caracteres.")
         } else if (err.message.includes('email')) {
           setError("Digite um email válido.")
-        } else if (err.message.includes('network')) {
-          setError("Erro de conexão. Verifique sua internet.")
+        } else if (err.message.includes('network') || err.message.includes('fetch')) {
+          setError("Erro de conexão. Verifique sua internet e tente novamente.")
         } else if (err.message.includes('Database error')) {
           setError("Erro no banco de dados. Tente novamente em alguns instantes.")
+        } else if (err.message.includes('Failed to fetch')) {
+          setError("Erro de conexão com o servidor. Verifique sua internet e tente novamente.")
         } else {
           setError(`Erro ao criar conta: ${err.message}`)
         }
       } else {
+        console.error('❌ Erro não é uma instância de Error:', err)
         setError("Erro ao criar conta. Tente novamente.")
       }
     } finally {

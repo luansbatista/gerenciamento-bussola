@@ -115,10 +115,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               name: profile?.full_name || session.user.user_metadata?.name || 'Usuário',
               role: profile?.role || (forceAdminForEmail(session.user.email || '') ? 'admin' : 'student'),
               isAdmin: profile?.is_admin || forceAdminForEmail(session.user.email || ''),
-              avatar: profile?.avatar_url || null,
+              avatar: profile?.avatar_url || undefined,
               studyGoal: profile?.study_goal || 4,
               currentStreak: profile?.current_streak || 0,
-              totalStudyHours: profile?.total_study_hours || 0
+              totalStudyHours: profile?.total_study_hours || 0,
+              createdAt: new Date(session.user.created_at)
             }
 
             console.log('✅ Usuário configurado:', userData)
@@ -133,10 +134,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               name: session.user.user_metadata?.name || 'Usuário',
               role: forceAdminForEmail(session.user.email || '') ? 'admin' : 'student',
               isAdmin: forceAdminForEmail(session.user.email || ''),
-              avatar: null,
+              avatar: undefined,
               studyGoal: 4,
               currentStreak: 0,
-              totalStudyHours: 0
+              totalStudyHours: 0,
+              createdAt: new Date(session.user.created_at)
             }
             
             console.log('✅ Usuário básico configurado:', basicUser)
@@ -290,7 +292,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (name: string, email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log('🔄 AuthContext: Iniciando signup para:', email)
+      
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -302,12 +306,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
 
+      console.log('🔄 AuthContext: Resposta do signup:', { data, error })
+
       if (error) {
+        console.error('❌ AuthContext: Erro do Supabase:', error)
         throw error
       }
+
+      console.log('✅ AuthContext: Signup realizado com sucesso')
     } catch (error) {
-      console.error('Erro no signup:', error)
-      throw error
+      console.error('❌ AuthContext: Erro no signup:', error)
+      console.error('❌ AuthContext: Tipo do erro:', typeof error)
+      console.error('❌ AuthContext: Erro completo:', JSON.stringify(error, null, 2))
+      
+      // Se o erro é um objeto do Supabase, extrair a mensagem
+      if (error && typeof error === 'object' && 'message' in error) {
+        throw new Error(error.message as string)
+      } else if (error && typeof error === 'object' && 'error_description' in error) {
+        throw new Error((error as any).error_description as string)
+      } else if (error && typeof error === 'object' && 'msg' in error) {
+        throw new Error((error as any).msg as string)
+      } else {
+        // Se não conseguir extrair a mensagem, criar um erro genérico
+        throw new Error('Erro desconhecido ao criar conta')
+      }
     }
   }
 
